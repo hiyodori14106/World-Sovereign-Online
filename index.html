@@ -2,267 +2,123 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>World Sovereign 3D - 地図統合版</title>
+    <title>World Sovereign - Globe Base</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Helvetica Neue', Arial, sans-serif; color: white; }
-        #ui-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
-        .panel { pointer-events: auto; background: rgba(10, 10, 15, 0.85); padding: 20px; border-radius: 12px; border: 1px solid #00d4ff; box-shadow: 0 0 15px rgba(0, 212, 255, 0.3); }
-        
-        #player-stats { position: absolute; top: 20px; left: 20px; width: 280px; }
-        #nation-panel { position: absolute; top: 20px; right: 20px; width: 280px; display: none; }
-        #game-log { position: absolute; bottom: 20px; left: 20px; width: 450px; height: 150px; overflow-y: auto; font-size: 13px; line-height: 1.6; border-left: 4px solid #00d4ff; }
-        
-        h2, h3 { margin: 0 0 10px 0; color: #00d4ff; text-transform: uppercase; letter-spacing: 1px; }
-        .stat-val { float: right; font-weight: bold; color: #ffca28; }
-        button { cursor: pointer; background: #1a1a2e; color: #fff; border: 1px solid #00d4ff; padding: 10px; margin: 5px 0; width: 100%; border-radius: 5px; transition: 0.2s; }
-        button:hover { background: #00d4ff; color: #000; font-weight: bold; }
-        .attack-btn { border-color: #ff4b2b; }
-        .attack-btn:hover { background: #ff4b2b; }
-        
-        /* 読み込み中表示 */
-        #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; }
+        body { margin: 0; overflow: hidden; background: #000; }
+        canvas { display: block; }
+        #overlay {
+            position: absolute; top: 20px; left: 20px;
+            color: #00d4ff; font-family: sans-serif;
+            pointer-events: none; text-shadow: 0 0 10px #000;
+        }
     </style>
 </head>
 <body>
 
-<div id="loading">地球データを読み込み中...</div>
-
-<div id="ui-container">
-    <!-- 自国ステータス -->
-    <div id="player-stats" class="panel">
-        <h2>自国の情勢</h2>
-        <div>領土: <span class="stat-val">プレイヤー帝国</span></div>
-        <div>資金: <span id="p-money" class="stat-val">1000</span></div>
-        <div style="margin-bottom:10px;">軍事力: <span id="p-military" class="stat-val">150</span></div>
-        <button onclick="nextTurn()">翌年へ進む (ターン終了)</button>
-    </div>
-
-    <!-- 選択した国の情報 -->
-    <div id="nation-panel" class="panel">
-        <h3 id="n-name">国家名</h3>
-        <div>軍事力: <span id="n-military" class="stat-val">-</span></div>
-        <div style="margin-bottom:15px;">友好度: <span id="n-relation" class="stat-val">-</span></div>
-        <button onclick="interact('gift')">経済援助 (コスト: 100)</button>
-        <button onclick="interact('alliance')">同盟の提案</button>
-        <button onclick="interact('attack')" class="attack-btn">宣戦布告 (侵攻開始)</button>
-    </div>
-
-    <!-- ログ -->
-    <div id="game-log" class="panel">
-        <div>>> 世界情勢の監視を開始しました。地球をドラッグして回転、スクロールでズーム、光る拠点をクリックしてください。</div>
-    </div>
+<div id="overlay">
+    <h1>World Sovereign</h1>
+    <p>Drag to Rotate / Scroll to Zoom</p>
 </div>
 
-<!-- Three.js & Controls -->
+<!-- Three.js Library -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- 操縦用ライブラリ -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
 <script>
 /**
- * 1. ゲームデータ設定
- */
-let player = { money: 1000, military: 150 };
-const nations = [
-    { name: "アメリカ合衆国", lat: 38, lon: -97, military: 500, relation: 50, color: 0x0055ff },
-    { name: "日本", lat: 35, lon: 139, military: 200, relation: 100, color: 0xffffff },
-    { name: "中国", lat: 35, lon: 104, military: 600, relation: 30, color: 0xff0000 },
-    { name: "ロシア", lat: 61, lon: 105, military: 550, relation: 20, color: 0xaaaaaa },
-    { name: "ブラジル", lat: -14, lon: -51, military: 150, relation: 60, color: 0x00ff00 },
-    { name: "イギリス", lat: 55, lon: -3, military: 300, relation: 70, color: 0x0000ff },
-    { name: "オーストラリア", lat: -25, lon: 133, military: 180, relation: 65, color: 0xffaa00 },
-    { name: "南アフリカ", lat: -30, lon: 25, military: 120, relation: 50, color: 0x00ffaa }
-];
-
-let selectedNation = null;
-
-/**
- * 2. 3Dシーンのセットアップ
+ * 1. シーンの基本設定
  */
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.z = 6;
+
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 document.body.appendChild(renderer.domElement);
 
+// マウス操作設定
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.minDistance = 3;
-controls.maxDistance = 10;
-
-// 光源
-const light = new THREE.AmbientLight(0xffffff, 0.8);
-scene.add(light);
-const dLight = new THREE.DirectionalLight(0xffffff, 0.5);
-dLight.position.set(5, 3, 5);
-scene.add(dLight);
+controls.enableDamping = true; // 滑らかな動き
 
 /**
- * 3. 地球の作成 (テクスチャ貼り付け)
+ * 2. 軽量な地球の作成
+ * 高重な画像の代わりに、軽量な地図テクスチャ（低解像度）を使用
+ * もしくは色だけで表現
  */
 const loader = new THREE.TextureLoader();
-// 高解像度の地球テクスチャ（NASA Blue Marble 互換）
-const earthTexture = loader.load('https://unpkg.com/threejs-earth-map@1.0.0/static/earth8081.jpg', () => {
-    document.getElementById('loading').style.display = 'none';
-});
+// 爆速ロードのために1kサイズの軽量地図を使用（万が一読み込めなくても動くよう色を設定）
+const earthTexture = loader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg');
 
-const earthGeom = new THREE.SphereGeometry(2, 64, 64);
-const earthMat = new THREE.MeshPhongMaterial({
+const geometry = new THREE.SphereGeometry(2, 64, 64);
+const material = new THREE.MeshPhongMaterial({
     map: earthTexture,
-    bumpScale: 0.05,
-    specular: new THREE.Color('grey'),
-    shininess: 10
+    color: 0x2244ff, // 読み込み中のベース色
+    shininess: 5
 });
-const earth = new THREE.Mesh(earthGeom, earthMat);
+const earth = new THREE.Mesh(geometry, material);
 scene.add(earth);
 
-// 星空の背景
-const starGeom = new THREE.SphereGeometry(90, 32, 32);
-const starMat = new THREE.MeshBasicMaterial({
-    map: loader.load('https://cdn.rawgit.com/turban/three.js/master/examples/textures/planets/galaxy_starfield.png'),
-    side: THREE.BackSide
+// グリッド（緯線・経線）を追加して「地球儀感」を出す
+const gridGeom = new THREE.SphereGeometry(2.01, 32, 32);
+const gridMat = new THREE.MeshBasicMaterial({
+    color: 0x00d4ff,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.1
 });
-scene.add(new THREE.Mesh(starGeom, starMat));
+const grid = new THREE.Mesh(gridGeom, gridMat);
+scene.add(grid);
 
 /**
- * 4. 国家マーカーの配置
+ * 3. 宇宙の背景
  */
-const markerGroup = new THREE.Group();
-scene.add(markerGroup);
-
-function latLonToVector3(lat, lon, radius) {
-    const phi = (90 - lat) * (Math.PI / 180);
-    const theta = (lon + 180) * (Math.PI / 180);
-    return new THREE.Vector3(
-        -radius * Math.sin(phi) * Math.cos(theta),
-        radius * Math.cos(phi),
-        radius * Math.sin(phi) * Math.sin(theta)
-    );
+const starGeometry = new THREE.BufferGeometry();
+const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.05 });
+const starVertices = [];
+for (let i = 0; i < 5000; i++) {
+    starVertices.push((Math.random() - 0.5) * 100, (Math.random() - 0.5) * 100, (Math.random() - 0.5) * 100);
 }
-
-nations.forEach(n => {
-    const geo = new THREE.SphereGeometry(0.04, 16, 16);
-    const mat = new THREE.MeshBasicMaterial({ color: 0x00d4ff });
-    const mesh = new THREE.Mesh(geo, mat);
-    const pos = latLonToVector3(n.lat, n.lon, 2.01);
-    mesh.position.copy(pos);
-    mesh.userData = n; // データを保持
-    markerGroup.add(mesh);
-
-    // 光る輪（エフェクト）
-    const ringGeo = new THREE.RingGeometry(0.05, 0.07, 32);
-    const ringMat = new THREE.MeshBasicMaterial({ color: 0x00d4ff, side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.position.copy(pos);
-    ring.lookAt(new THREE.Vector3(0,0,0));
-    markerGroup.add(ring);
-});
-
-camera.position.z = 6;
+starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+const stars = new THREE.Points(starGeometry, starMaterial);
+scene.add(stars);
 
 /**
- * 5. インタラクション
+ * 4. 光源
  */
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+scene.add(ambientLight);
 
-window.addEventListener('click', (event) => {
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    raycaster.setFromCamera(mouse, camera);
-
-    const intersects = raycaster.intersectObjects(markerGroup.children);
-    if (intersects.length > 0) {
-        const data = intersects[0].object.userData;
-        if(data) showNationInfo(data);
-    }
-});
-
-function showNationInfo(nation) {
-    selectedNation = nation;
-    document.getElementById('nation-panel').style.display = 'block';
-    document.getElementById('n-name').innerText = nation.name;
-    document.getElementById('n-military').innerText = nation.military;
-    document.getElementById('n-relation').innerText = nation.relation + " / 100";
-}
+const sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
+sunLight.position.set(5, 3, 5);
+scene.add(sunLight);
 
 /**
- * 6. ゲームロジック
- */
-function log(msg) {
-    const l = document.getElementById('game-log');
-    l.innerHTML = `<div>> ${msg}</div>` + l.innerHTML;
-}
-
-function interact(type) {
-    if (!selectedNation) return;
-
-    if (type === 'gift') {
-        if (player.money >= 100) {
-            player.money -= 100;
-            selectedNation.relation = Math.min(100, selectedNation.relation + 20);
-            log(`${selectedNation.name}に経済援助を行いました。友好度が上昇。`);
-        } else {
-            log("資金が足りません。");
-        }
-    } else if (type === 'alliance') {
-        if (selectedNation.relation >= 80) {
-            log(`${selectedNation.name}と同盟を結びました！`);
-            selectedNation.relation = 100;
-        } else {
-            log(`${selectedNation.name}：まだ信頼が足りないようです。`);
-        }
-    } else if (type === 'attack') {
-        log(`${selectedNation.name}への攻撃を開始！`);
-        if (player.military > selectedNation.military) {
-            const loot = Math.floor(selectedNation.military * 2);
-            player.money += loot;
-            log(`勝利！ ${loot}の資源を獲得。${selectedNation.name}は沈黙しました。`);
-            selectedNation.military = 0;
-            selectedNation.relation = 0;
-        } else {
-            player.military = Math.floor(player.military * 0.5);
-            log(`敗北... 我が軍は甚大な被害を受けました。`);
-        }
-    }
-    updateUI();
-}
-
-function nextTurn() {
-    player.money += 150;
-    player.military += 25;
-    nations.forEach(n => {
-        n.military += Math.floor(Math.random() * 20);
-        n.relation = Math.max(0, n.relation - 2);
-    });
-    log("新しい年が始まりました。予算が計上されました。");
-    updateUI();
-}
-
-function updateUI() {
-    document.getElementById('p-money').innerText = player.money;
-    document.getElementById('p-military').innerText = player.military;
-    if (selectedNation) {
-        document.getElementById('n-military').innerText = selectedNation.military;
-        document.getElementById('n-relation').innerText = selectedNation.relation + " / 100";
-    }
-}
-
-/**
- * 7. ループ
+ * 5. アニメーションループ
  */
 function animate() {
     requestAnimationFrame(animate);
+
+    // ゆっくり自転させる
+    earth.rotation.y += 0.001;
+    grid.rotation.y += 0.001;
+
     controls.update();
     renderer.render(scene, camera);
 }
+
 animate();
 
+/**
+ * 6. リサイズ対応
+ */
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
 </script>
 </body>
 </html>
