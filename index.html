@@ -1,124 +1,78 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <title>World Sovereign - Globe Base</title>
-    <style>
-        body { margin: 0; overflow: hidden; background: #000; }
-        canvas { display: block; }
-        #overlay {
-            position: absolute; top: 20px; left: 20px;
-            color: #00d4ff; font-family: sans-serif;
-            pointer-events: none; text-shadow: 0 0 10px #000;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>仮想国家ゲーム（自国作成）</title>
+<style>
+body { font-family:sans-serif; margin:0; background:#f0f0f0; }
+header { background:#3366cc; color:white; padding:1em; text-align:center; }
+main { display:flex; gap:20px; padding:20px; }
+#map { flex:2; height:600px; background:url('world-map.png') no-repeat center/cover; border:2px solid #3366cc; position:relative; }
+#panel { flex:1; background:white; padding:15px; border:2px solid #3366cc; border-radius:10px; height:600px; overflow-y:auto; }
+button { margin:5px 0; padding:8px 12px; background:#3366cc; color:white; border:none; border-radius:5px; cursor:pointer; }
+button:hover { background:#254a99; }
+.nation-marker { width:20px; height:20px; border-radius:50%; position:absolute; border:2px solid white; text-align:center; font-size:10px; color:white; line-height:20px;}
+input { padding:5px; margin:5px 0; width:90%; }
+</style>
 </head>
 <body>
-
-<div id="overlay">
-    <h1>World Sovereign</h1>
-    <p>Drag to Rotate / Scroll to Zoom</p>
-</div>
-
-<!-- Three.js Library -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<!-- 操縦用ライブラリ -->
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<header><h1>仮想国家ゲーム（自国作成）</h1></header>
+<main>
+  <div id="map"></div>
+  <div id="panel">
+    <h2>自国作成</h2>
+    <p>国名: <input type="text" id="nationInput" placeholder="国名を入力"></p>
+    <button onclick="createNation()">作成</button>
+    <h3>自国情報</h3>
+    <p>国名: <span id="nationName">未作成</span></p>
+    <p>経済: <span id="economy">50</span></p>
+    <p>科学: <span id="science">50</span></p>
+    <p>文化: <span id="culture">50</span></p>
+    <p>社会: <span id="society">50</span></p>
+  </div>
+</main>
 
 <script>
-/**
- * 1. シーンの基本設定
- */
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.z = 6;
+let nation = null;
+const map = document.getElementById("map");
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
-document.body.appendChild(renderer.domElement);
+function createNation() {
+  const name = document.getElementById("nationInput").value.trim();
+  if(!name){ alert("国名を入力してください"); return; }
 
-// マウス操作設定
-const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true; // 滑らかな動き
+  // 自国データ
+  nation = {
+    name: name,
+    economy: 50,
+    science: 50,
+    culture: 50,
+    society: 50,
+    x: Math.random() * (map.clientWidth - 20),
+    y: Math.random() * (map.clientHeight - 20)
+  };
 
-/**
- * 2. 軽量な地球の作成
- * 高重な画像の代わりに、軽量な地図テクスチャ（低解像度）を使用
- * もしくは色だけで表現
- */
-const loader = new THREE.TextureLoader();
-// 爆速ロードのために1kサイズの軽量地図を使用（万が一読み込めなくても動くよう色を設定）
-const earthTexture = loader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg');
+  // マーカー表示
+  const marker = document.createElement("div");
+  marker.classList.add("nation-marker");
+  marker.style.left = nation.x + "px";
+  marker.style.top = nation.y + "px";
+  marker.style.background = "red";
+  marker.innerText = nation.name[0]; // 最初の文字を表示
+  map.appendChild(marker);
 
-const geometry = new THREE.SphereGeometry(2, 64, 64);
-const material = new THREE.MeshPhongMaterial({
-    map: earthTexture,
-    color: 0x2244ff, // 読み込み中のベース色
-    shininess: 5
-});
-const earth = new THREE.Mesh(geometry, material);
-scene.add(earth);
-
-// グリッド（緯線・経線）を追加して「地球儀感」を出す
-const gridGeom = new THREE.SphereGeometry(2.01, 32, 32);
-const gridMat = new THREE.MeshBasicMaterial({
-    color: 0x00d4ff,
-    wireframe: true,
-    transparent: true,
-    opacity: 0.1
-});
-const grid = new THREE.Mesh(gridGeom, gridMat);
-scene.add(grid);
-
-/**
- * 3. 宇宙の背景
- */
-const starGeometry = new THREE.BufferGeometry();
-const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.05 });
-const starVertices = [];
-for (let i = 0; i < 5000; i++) {
-    starVertices.push((Math.random() - 0.5) * 100, (Math.random() - 0.5) * 100, (Math.random() - 0.5) * 100);
-}
-starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
-const stars = new THREE.Points(starGeometry, starMaterial);
-scene.add(stars);
-
-/**
- * 4. 光源
- */
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-scene.add(ambientLight);
-
-const sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
-sunLight.position.set(5, 3, 5);
-scene.add(sunLight);
-
-/**
- * 5. アニメーションループ
- */
-function animate() {
-    requestAnimationFrame(animate);
-
-    // ゆっくり自転させる
-    earth.rotation.y += 0.001;
-    grid.rotation.y += 0.001;
-
-    controls.update();
-    renderer.render(scene, camera);
+  // パネル更新
+  updatePanel();
 }
 
-animate();
-
-/**
- * 6. リサイズ対応
- */
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-});
-
+function updatePanel() {
+  if(!nation) return;
+  document.getElementById("nationName").innerText = nation.name;
+  document.getElementById("economy").innerText = nation.economy;
+  document.getElementById("science").innerText = nation.science;
+  document.getElementById("culture").innerText = nation.culture;
+  document.getElementById("society").innerText = nation.society;
+}
 </script>
 </body>
 </html>
