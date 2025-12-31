@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Global Nations - Perfect Tabs</title>
+  <title>Global Nations Online - Perfect Final</title>
+  <!-- フォントとアイコン -->
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -29,7 +30,7 @@
       background-color: var(--bg-body);
       color: var(--text-main);
       margin: 0;
-      overflow: hidden; /* 全体スクロール禁止 */
+      overflow: hidden; /* 画面全体のスクロール禁止 */
       height: 100vh;
       display: flex;
     }
@@ -42,6 +43,7 @@
       display: flex;
       flex-direction: column;
       padding: 20px;
+      box-shadow: 4px 0 15px rgba(0,0,0,0.1);
       z-index: 20;
       flex-shrink: 0;
     }
@@ -52,6 +54,7 @@
       color: var(--primary);
       margin-bottom: 20px;
       text-align: center;
+      letter-spacing: 1px;
     }
     .brand span { color: white; }
 
@@ -93,25 +96,39 @@
       height: 100vh;
     }
 
+    .news-ticker {
+      flex: 0 0 auto;
+      background: #0f172a;
+      color: #10b981;
+      font-family: monospace;
+      padding: 8px 15px;
+      font-size: 0.85rem;
+      white-space: nowrap;
+      overflow: hidden;
+      border-bottom: 1px solid var(--border);
+    }
+
     header {
       flex: 0 0 auto;
       background: var(--bg-card);
       padding: 15px 30px;
       display: flex; justify-content: space-between; align-items: center;
       border-bottom: 1px solid var(--border);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
-    header h3 { margin: 0; font-weight: 800; color: var(--bg-sidebar); font-size: 1.3rem; }
+    header h3 { margin: 0; font-weight: 800; color: var(--bg-sidebar); font-size: 1.3rem; display: flex; align-items: center; gap: 10px; }
     .total-score {
       background: var(--bg-body); padding: 8px 16px; border-radius: 8px; font-weight: bold; border: 1px solid var(--border);
     }
+    .total-score b { color: var(--primary); font-size: 1.1rem; }
 
-    /* --- タブ切り替えボタン --- */
+    /* タブ */
     .tabs {
       flex: 0 0 auto;
       display: flex;
       background: white;
       padding: 0 20px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      box-shadow: 0 4px 6px -4px rgba(0,0,0,0.1);
       z-index: 10;
     }
     .tab-btn {
@@ -126,23 +143,21 @@
       background: var(--primary);
     }
 
-    /* --- パネルコンテナ (ここが重要: 独立スクロール) --- */
+    /* --- コンテンツエリア (スクロール修正済み) --- */
     #panel-container {
       flex: 1;
       position: relative;
-      overflow: hidden; /* コンテナ自体はスクロールしない */
+      overflow: hidden;
     }
 
     .panel {
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
       padding: 20px;
-      overflow-y: auto; /* 中身だけスクロール */
-      display: none; /* 初期状態は非表示 */
+      overflow-y: auto; /* 縦スクロール */
+      display: none;
       padding-bottom: 80px;
     }
-    
-    /* アクティブなパネルだけ表示 */
     .panel.active { display: block; animation: fadeIn 0.3s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -160,9 +175,9 @@
     button {
       background: var(--primary); color: white; border: none; padding: 12px;
       border-radius: 8px; font-weight: 700; cursor: pointer; width: 100%;
-      margin-bottom: 8px; transition: 0.2s; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+      margin-bottom: 8px; transition: all 0.2s; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
     }
-    button:hover { transform: translateY(-1px); }
+    button:hover { transform: translateY(-1px); filter: brightness(1.1); }
     button.danger { background: var(--danger); box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3); }
     button.secondary { background: #64748b; box-shadow: none; }
     
@@ -170,12 +185,13 @@
       width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: #f8fafc;
     }
 
-    /* マップ専用スタイル */
+    /* マップ */
     .map-wrapper { text-align: center; }
     .map-container {
       display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
       background: #334155; padding: 10px; border-radius: 12px;
       max-width: 400px; margin: 0 auto;
+      min-height: 200px;
     }
     .map-tile {
       aspect-ratio: 1 / 1; background-color: #cbd5e1; border-radius: 4px;
@@ -193,10 +209,11 @@
     }
     .chat-msg {
       margin-bottom: 8px; padding: 8px 12px; border-radius: 8px; background: white;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 0.9rem;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 0.9rem; border-left: 3px solid transparent;
     }
     .chat-time { font-size: 0.7rem; color: #94a3b8; margin-right: 8px; }
     
+    #leaderboard { max-height: 350px; overflow-y: auto; }
     .rank-item {
       display: flex; justify-content: space-between; align-items: center;
       padding: 10px; border-bottom: 1px solid var(--border);
@@ -224,15 +241,15 @@
       width: 28px; height: 28px; border-radius: 50%; border: 2px solid #e2e8f0; cursor: pointer;
     }
     .color-btn.selected { border-color: #334155; transform: scale(1.2); box-shadow: 0 0 0 2px #cbd5e1; }
+    
     .hidden { display: none !important; }
-
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
   </style>
 </head>
 <body>
 
-  <!-- 建国モーダル (初回のみ表示) -->
+  <!-- 建国モーダル -->
   <div id="modal-overlay">
     <div class="modal-box">
       <h1 style="color:var(--bg-sidebar); margin:0 0 10px 0;">Global Nations</h1>
@@ -243,7 +260,7 @@
         <input type="text" id="inp-name" placeholder="例: スクラッチ帝国" maxlength="12">
         
         <div style="margin-top:20px; text-align:center;">
-          <label style="font-size:0.9rem; font-weight:bold; display:block; margin-bottom:10px;">国旗デザイン</label>
+          <label style="font-size:0.9rem; font-weight:bold; display:block; margin-bottom:10px;">国旗デザイン (クリックで描く)</label>
           <div class="color-palette" id="palette"></div>
           <div class="editor-grid" id="flag-editor"></div>
         </div>
@@ -279,7 +296,7 @@
       </div>
     </div>
 
-    <!-- メインコンテンツ -->
+    <!-- メイン -->
     <div class="main-content">
       
       <header>
@@ -289,18 +306,18 @@
         </div>
       </header>
 
-      <!-- タブボタン -->
+      <!-- タブ -->
       <div class="tabs">
-        <button class="tab-btn active" id="btn-dashboard" onclick="switchTab('dashboard')"><i class="fas fa-chart-pie"></i> 内政 (Dashboard)</button>
+        <button class="tab-btn active" id="btn-dashboard" onclick="switchTab('dashboard')"><i class="fas fa-chart-pie"></i> 内政</button>
         <button class="tab-btn" id="btn-economy" onclick="switchTab('economy')"><i class="fas fa-hand-holding-usd"></i> 経済</button>
-        <button class="tab-btn" id="btn-map" onclick="switchTab('map')"><i class="fas fa-map-marked-alt"></i> 地図 (Map)</button>
+        <button class="tab-btn" id="btn-map" onclick="switchTab('map')"><i class="fas fa-map-marked-alt"></i> 地図・戦争</button>
         <button class="tab-btn" id="btn-diplomacy" onclick="switchTab('diplomacy')"><i class="fas fa-globe"></i> 外交</button>
       </div>
 
-      <!-- パネルコンテナ (コンテンツエリア) -->
+      <!-- パネルコンテナ -->
       <div id="panel-container">
         
-        <!-- 1. ダッシュボード (内政) -->
+        <!-- 1. ダッシュボード -->
         <div id="tab-dashboard" class="panel active">
           <div class="card">
             <h4><i class="fas fa-poll"></i> 国民支持率</h4>
@@ -353,7 +370,7 @@
           </div>
         </div>
 
-        <!-- 3. マップ & 戦争 (完全に独立したタブ) -->
+        <!-- 3. マップ & 戦争 (完全に独立) -->
         <div id="tab-map" class="panel">
           <div class="grid-2">
               <div class="card map-wrapper">
@@ -411,7 +428,8 @@
     // ▼ 設定 & データ
     // ============================================
     const PANTRY_ID = "9C9B3581-6D5B-48A0-8C04-d32DBFE128A8"; 
-    const BASKET_NAME = "global_nations_v11_fix";
+    // バグ回避のためバージョン番号を更新し、クラウドデータをリセット
+    const BASKET_NAME = "global_nations_v12_perfect"; 
     const API_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/${BASKET_NAME}`;
 
     let editColor = "#3b82f6";
@@ -446,12 +464,14 @@
     window.onload = function() {
       initFlagEditor();
       
-      if(localStorage.getItem("gn_save_v11")) {
+      // ローカル保存データがあればロード
+      if(localStorage.getItem("gn_save_v12")) {
         try {
-          const saved = JSON.parse(localStorage.getItem("gn_save_v11"));
+          const saved = JSON.parse(localStorage.getItem("gn_save_v12"));
           gameData = {...gameData, ...saved};
           flagPixels = gameData.flag || new Array(40).fill("#ffffff");
           
+          // 建国画面をスキップしてゲーム開始
           document.getElementById('modal-overlay').classList.add('hidden');
           document.getElementById('app').classList.remove('hidden');
           
@@ -558,6 +578,7 @@
         const res = await fetch(API_URL);
         if(res.ok) {
           const data = await res.json();
+          // データの整合性チェック
           if(!data.nations) data.nations = {};
           if(!data.chat) data.chat = [];
           if(!data.map || !Array.isArray(data.map) || data.map.length !== 25) {
@@ -596,7 +617,7 @@
       } catch(e) { console.error("Sync Error", e); }
     }
 
-    // --- 戦闘処理 (オフライン戦闘の解決) ---
+    // --- 戦闘処理 (オフライン戦闘) ---
     function processPendingBattles() {
         if(!cloudData.battles) return;
         const myBattles = cloudData.battles.filter(b => b.defender === gameData.name);
@@ -613,6 +634,7 @@
             const winRate = enemyPower / (enemyPower + myPower);
 
             if(Math.random() < winRate) {
+                // 敗北
                 cloudData.map[battle.tileIndex] = { owner: battle.attacker, flag: battle.attackerFlag };
                 gameData.mil = Math.floor(gameData.mil * 0.7);
                 gameData.pop = Math.floor(gameData.pop * 0.9);
@@ -624,6 +646,7 @@
                     color: "#ef4444"
                 });
             } else {
+                // 防衛
                 addLog(`[防衛] ${battle.attacker} の攻撃を撃退しました。`);
                 cloudData.chat.push({
                     name: "戦争速報",
@@ -642,6 +665,8 @@
     function renderMap() {
         const container = document.getElementById('world-map');
         container.innerHTML = "";
+        
+        // 配列保証
         const mapData = (cloudData.map && Array.isArray(cloudData.map) && cloudData.map.length === 25) 
                         ? cloudData.map 
                         : new Array(25).fill({owner: null, flag: null});
@@ -671,6 +696,7 @@
     }
 
     function handleMapClick(index, tile) {
+        // 空き地
         if(!tile || !tile.owner) {
             if(gameData.money < 300) return alert("領有費用: 300資金が必要です。");
             if(confirm("この空き地を領有しますか？ (費用: 300)")) {
@@ -680,8 +706,10 @@
             }
             return;
         }
+        // 自国領
         if(tile.owner === gameData.name) return;
 
+        // 他国領 (戦争)
         const targetName = tile.owner;
         const targetData = cloudData.nations[targetName];
         if(!targetData) return;
@@ -725,6 +753,7 @@
         renderMap(); renderLeaderboard();
     }
 
+    // --- ランキング描画 ---
     function renderLeaderboard() {
       const list = document.getElementById('leaderboard');
       list.innerHTML = "";
@@ -784,6 +813,7 @@
       inp.value = "";
     }
 
+    // --- ゲームループ ---
     function startGameLoop() {
       timer = setInterval(() => {
         gameData.day++;
@@ -792,12 +822,13 @@
         if(gameData.food < 0) { gameData.food = 0; gameData.pop -= 5; gameData.app -= 5; }
         if(gameData.tax > 30) gameData.app--; else if(gameData.tax < 15) gameData.app++;
         if(gameData.app > 100) gameData.app = 100;
-        if(gameData.app <= 0) { gameData.money = Math.floor(gameData.money/2); gameData.app=50; addLog("暴動発生！支持率低下により資金が半減しました。"); }
+        if(gameData.app <= 0) { gameData.money = Math.floor(gameData.money/2); gameData.app=50; addLog("暴動発生！資金半減"); }
         updateUI();
-        localStorage.setItem("gn_save_v11", JSON.stringify(gameData));
+        localStorage.setItem("gn_save_v12", JSON.stringify(gameData));
       }, 3000);
     }
 
+    // アクション関数
     function actionInvest() {
       if(gameData.money < 500 || gameData.mat < 10) return alert("資金500、資材10が必要です。");
       gameData.money -= 500; gameData.mat -= 10; gameData.pop += 50; updateUI();
