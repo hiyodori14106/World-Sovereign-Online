@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Global Nations Online - Final Fix</title>
+  <title>Global Nations Online - AutoSave Fix</title>
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
   <!-- FontAwesome -->
@@ -33,7 +33,7 @@
       background-color: var(--bg-body);
       color: var(--text-main);
       margin: 0;
-      overflow: hidden;
+      overflow: hidden; /* 全体スクロール禁止（内部でスクロール） */
       height: 100vh;
       display: flex;
     }
@@ -71,7 +71,6 @@
     }
     #disp-name { margin: 10px 0 5px; font-size: 1.1rem; font-weight: 800; }
     
-    /* 国旗表示用コンテナ */
     .flag-display {
       width: 80px;
       height: 50px;
@@ -99,11 +98,6 @@
       font-size: 0.75rem;
       color: var(--text-muted);
     }
-    .game-date {
-      background: var(--primary); color: white;
-      padding: 4px 12px; border-radius: 20px;
-      font-weight: bold; display: inline-block; margin-bottom: 5px; font-size: 0.8rem;
-    }
 
     /* --- メインコンテンツ --- */
     .main-content {
@@ -112,10 +106,10 @@
       flex-direction: column;
       position: relative;
       background: #f8fafc;
-      min-width: 0; /* Flexboxのはみ出し防止 */
+      min-width: 0;
+      height: 100vh; /* 高さ確保 */
     }
 
-    /* ニュースティッカー */
     .news-ticker {
       background: #0f172a;
       color: #10b981;
@@ -125,9 +119,9 @@
       white-space: nowrap;
       overflow: hidden;
       border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
     }
 
-    /* ヘッダー */
     header {
       background: var(--bg-card);
       padding: 15px 30px;
@@ -136,6 +130,7 @@
       align-items: center;
       border-bottom: 1px solid var(--border);
       box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      flex-shrink: 0;
     }
     header h3 { margin: 0; font-weight: 800; color: var(--bg-sidebar); font-size: 1.3rem; display: flex; align-items: center; gap: 10px; }
     .total-score {
@@ -148,13 +143,13 @@
     }
     .total-score b { color: var(--primary); font-size: 1.1rem; }
 
-    /* タブ */
     .tabs {
       display: flex;
       background: white;
       padding: 0 20px;
       box-shadow: 0 4px 6px -4px rgba(0,0,0,0.1);
       z-index: 5;
+      flex-shrink: 0;
     }
     .tab-btn {
       flex: 1;
@@ -175,12 +170,13 @@
       background: var(--primary); border-radius: 3px 3px 0 0;
     }
 
-    /* パネル & カード */
+    /* パネル (ここがスクロールエリア) */
     .panel {
       flex: 1;
       padding: 20px;
-      overflow-y: auto;
-      display: none; /* JSで切り替え */
+      overflow-y: auto; /* 縦スクロール許可 */
+      display: none;
+      min-height: 0; /* Flexbox内でのスクロールに必須 */
     }
     .panel.active { display: block; animation: fadeIn 0.4s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -204,7 +200,6 @@
       display: flex; align-items: center; gap: 8px;
     }
 
-    /* ボタン */
     button {
       background: var(--primary);
       color: white;
@@ -225,7 +220,6 @@
     button.danger { background: var(--danger); box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3); }
     button.secondary { background: #64748b; box-shadow: none; }
     
-    /* 入力フォーム */
     input[type="text"], input[type="range"] {
       width: 100%; padding: 10px; border-radius: 8px;
       border: 1px solid var(--border); background: #f8fafc;
@@ -233,7 +227,7 @@
     }
     input[type="text"]:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
 
-    /* --- マップ (Map) --- */
+    /* マップ */
     .map-wrapper { text-align: center; }
     .map-container {
       display: grid;
@@ -256,13 +250,13 @@
       align-items: center;
       position: relative;
       transition: all 0.1s;
-      border-bottom: 3px solid rgba(0,0,0,0.2); /* 立体感 */
+      border-bottom: 3px solid rgba(0,0,0,0.2);
     }
     .map-tile:hover { transform: scale(1.05); z-index: 5; filter: brightness(1.1); border-color: white; }
     .map-tile:active { transform: scale(0.95); border-bottom-width: 0; margin-top: 3px; }
     .map-legend { font-size: 0.8rem; color: var(--text-muted); margin-top: 10px; }
 
-    /* --- チャット & ランキング --- */
+    /* チャット & ランキング */
     .chat-area {
       height: 250px;
       background: #f1f5f9;
@@ -289,7 +283,7 @@
     .rank-myself { background-color: #eff6ff; border-left: 3px solid var(--primary); }
     .status-dot { font-size: 0.6rem; margin-right: 6px; }
 
-    /* --- モーダル & 国旗エディタ --- */
+    /* モーダル & エディタ */
     #modal-overlay {
       position: fixed; inset: 0;
       background: rgba(15, 23, 42, 0.9);
@@ -303,7 +297,6 @@
       max-height: 90vh; overflow-y: auto;
     }
     
-    /* エディタ用グリッド */
     .editor-grid {
       display: grid;
       grid-template-columns: repeat(8, 1fr);
@@ -316,14 +309,9 @@
       border: 4px solid #334155;
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-    .editor-pixel {
-      background-color: white;
-      cursor: pointer;
-    }
+    .editor-pixel { background-color: white; cursor: pointer; }
     .editor-pixel:hover { opacity: 0.8; }
-    .color-palette {
-      display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;
-    }
+    .color-palette { display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
     .color-btn {
       width: 28px; height: 28px; border-radius: 50%; border: 2px solid #e2e8f0; cursor: pointer;
       transition: transform 0.2s;
@@ -517,10 +505,9 @@
     // ▼ 設定 & データ
     // ============================================
     const PANTRY_ID = "9C9B3581-6D5B-48A0-8C04-d32DBFE128A8"; 
-    const BASKET_NAME = "global_nations_v7_final"; // バグ回避のため新規バスケット
+    const BASKET_NAME = "global_nations_v8_autosave"; // 新規バスケットでクリーンに開始
     const API_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/${BASKET_NAME}`;
 
-    // ドット絵エディタ用
     let editColor = "#3b82f6";
     let flagPixels = new Array(40).fill("#ffffff"); 
     const colors = ["#ef4444", "#3b82f6", "#10b981", "#f59e0b", "#ffffff", "#000000", "#6366f1", "#8b5cf6"];
@@ -542,7 +529,6 @@
     };
 
     let syncTimer;
-    // 初期値設定 (Mapのバグを防ぐため初期化を確実に)
     let cloudData = { 
         nations: {}, 
         chat: [],
@@ -550,31 +536,37 @@
         battles: [] 
     }; 
 
-    // --- 初期化 ---
+    // --- 初期化 (自動ログイン機能) ---
     window.onload = function() {
       initFlagEditor();
-      if(localStorage.getItem("gn_save_v7")) {
-        const saved = JSON.parse(localStorage.getItem("gn_save_v7"));
+      
+      // 保存データがあるかチェック
+      if(localStorage.getItem("gn_save_v8")) {
+        const saved = JSON.parse(localStorage.getItem("gn_save_v8"));
         gameData = {...gameData, ...saved};
-        document.getElementById('inp-name').value = gameData.name;
         flagPixels = gameData.flag || new Array(40).fill("#ffffff");
-        renderEditorGrid();
+        
+        // モーダルをスキップしてゲーム開始
+        document.getElementById('modal-overlay').classList.add('hidden');
+        document.getElementById('app').classList.remove('hidden');
+        
+        updateUI();
+        startGameLoop();
+        syncWithCloud(true);
+        syncTimer = setInterval(() => syncWithCloud(false), 5000);
       }
     };
 
-    // --- タブ切り替え (バグ修正版) ---
+    // --- タブ切り替え ---
     function switchTab(tabName) {
-        // パネルの切り替え
         document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
         const targetPanel = document.getElementById('tab-' + tabName);
         if(targetPanel) targetPanel.classList.add('active');
 
-        // ボタンの切り替え
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         const targetBtn = document.getElementById('btn-' + tabName);
         if(targetBtn) targetBtn.classList.add('active');
 
-        // タイトルの更新
         const titles = {
             'dashboard': '<i class="fas fa-home"></i> ダッシュボード',
             'economy': '<i class="fas fa-hand-holding-usd"></i> 経済',
@@ -584,7 +576,7 @@
         document.getElementById('panel-title').innerHTML = titles[tabName];
     }
 
-    // --- 国旗エディタ機能 ---
+    // --- 国旗エディタ ---
     function initFlagEditor() {
       const p = document.getElementById('palette');
       colors.forEach(c => {
@@ -632,7 +624,7 @@
         });
     }
 
-    // --- ゲーム開始 ---
+    // --- ゲーム開始 (手動) ---
     function startGame() {
       const name = document.getElementById('inp-name').value;
       if(!name) return alert("国名を入力してください。");
@@ -657,7 +649,6 @@
         const res = await fetch(API_URL);
         if(res.ok) {
           const data = await res.json();
-          // データ破損防止: 各プロパティが存在するかチェック
           if(!data.nations) data.nations = {};
           if(!data.chat) data.chat = [];
           if(!data.map || !Array.isArray(data.map) || data.map.length !== 25) {
@@ -682,7 +673,6 @@
         if(isFirstTime) {
           cloudData.chat.push({name: "SYSTEM", text: `${gameData.name} が接続しました。`, time: getTimeStr(), color: "#94a3b8"});
         }
-
         if(cloudData.chat.length > 50) cloudData.chat = cloudData.chat.slice(-50);
         
         await fetch(API_URL, {
@@ -694,7 +684,6 @@
         renderLeaderboard();
         renderChat();
         renderMap();
-
       } catch(e) { console.error("Sync Error", e); }
     }
 
@@ -704,7 +693,6 @@
         if(myBattles.length === 0) return;
 
         let battleHappened = false;
-
         myBattles.forEach(battle => {
             if (!cloudData.map[battle.tileIndex]) return;
             const tile = cloudData.map[battle.tileIndex];
@@ -736,7 +724,6 @@
             }
             battleHappened = true;
         });
-
         cloudData.battles = cloudData.battles.filter(b => b.defender !== gameData.name);
         if(battleHappened) { updateUI(); }
     }
@@ -744,8 +731,6 @@
     function renderMap() {
         const container = document.getElementById('world-map');
         container.innerHTML = "";
-        
-        // cloudData.map が確実に配列であることを保証してループ
         const mapData = (cloudData.map && Array.isArray(cloudData.map) && cloudData.map.length === 25) 
                         ? cloudData.map 
                         : new Array(25).fill({owner: null, flag: null});
@@ -791,7 +776,6 @@
         if(!targetData) return;
 
         const isOnline = (Date.now() - targetData.updated) < 60000;
-
         if(isOnline) {
             const enemyPower = targetData.mil;
             const confirmMsg = `[宣戦布告]\n相手: ${targetName} (オンライン)\n敵戦力: ${enemyPower}\n\n攻撃しますか？`;
@@ -898,9 +882,8 @@
         if(gameData.tax > 30) gameData.app--; else if(gameData.tax < 15) gameData.app++;
         if(gameData.app > 100) gameData.app = 100;
         if(gameData.app <= 0) { gameData.money = Math.floor(gameData.money/2); gameData.app=50; addLog("暴動発生！資金半減"); }
-        
         updateUI();
-        localStorage.setItem("gn_save_v7", JSON.stringify(gameData));
+        localStorage.setItem("gn_save_v8", JSON.stringify(gameData));
       }, 3000);
     }
 
@@ -939,7 +922,6 @@
       renderMiniFlag(document.getElementById('disp-flag'), gameData.flag);
       
       document.getElementById('game-date').innerText = "Day " + gameData.day;
-      
       document.getElementById('val-money').innerText = gameData.money;
       document.getElementById('val-pop').innerText = gameData.pop;
       document.getElementById('val-food').innerText = gameData.food;
