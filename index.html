@@ -1,78 +1,36 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>仮想国家ゲーム（自国作成）</title>
-<style>
-body { font-family:sans-serif; margin:0; background:#f0f0f0; }
-header { background:#3366cc; color:white; padding:1em; text-align:center; }
-main { display:flex; gap:20px; padding:20px; }
-#map { flex:2; height:600px; background:url('world-map.png') no-repeat center/cover; border:2px solid #3366cc; position:relative; }
-#panel { flex:1; background:white; padding:15px; border:2px solid #3366cc; border-radius:10px; height:600px; overflow-y:auto; }
-button { margin:5px 0; padding:8px 12px; background:#3366cc; color:white; border:none; border-radius:5px; cursor:pointer; }
-button:hover { background:#254a99; }
-.nation-marker { width:20px; height:20px; border-radius:50%; position:absolute; border:2px solid white; text-align:center; font-size:10px; color:white; line-height:20px;}
-input { padding:5px; margin:5px 0; width:90%; }
-</style>
+  <meta charset="UTF-8">
+  <title>世界地図（GeoJSON）</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map { height: 100vh; }
+  </style>
 </head>
 <body>
-<header><h1>仮想国家ゲーム（自国作成）</h1></header>
-<main>
-  <div id="map"></div>
-  <div id="panel">
-    <h2>自国作成</h2>
-    <p>国名: <input type="text" id="nationInput" placeholder="国名を入力"></p>
-    <button onclick="createNation()">作成</button>
-    <h3>自国情報</h3>
-    <p>国名: <span id="nationName">未作成</span></p>
-    <p>経済: <span id="economy">50</span></p>
-    <p>科学: <span id="science">50</span></p>
-    <p>文化: <span id="culture">50</span></p>
-    <p>社会: <span id="society">50</span></p>
-  </div>
-</main>
 
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
-let nation = null;
-const map = document.getElementById("map");
+  // 地図を作る
+  const map = L.map('map').setView([20, 0], 2);
 
-function createNation() {
-  const name = document.getElementById("nationInput").value.trim();
-  if(!name){ alert("国名を入力してください"); return; }
+  // ベース地図（OpenStreetMap）
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
 
-  // 自国データ
-  nation = {
-    name: name,
-    economy: 50,
-    science: 50,
-    culture: 50,
-    society: 50,
-    x: Math.random() * (map.clientWidth - 20),
-    y: Math.random() * (map.clientHeight - 20)
-  };
-
-  // マーカー表示
-  const marker = document.createElement("div");
-  marker.classList.add("nation-marker");
-  marker.style.left = nation.x + "px";
-  marker.style.top = nation.y + "px";
-  marker.style.background = "red";
-  marker.innerText = nation.name[0]; // 最初の文字を表示
-  map.appendChild(marker);
-
-  // パネル更新
-  updatePanel();
-}
-
-function updatePanel() {
-  if(!nation) return;
-  document.getElementById("nationName").innerText = nation.name;
-  document.getElementById("economy").innerText = nation.economy;
-  document.getElementById("science").innerText = nation.science;
-  document.getElementById("culture").innerText = nation.culture;
-  document.getElementById("society").innerText = nation.society;
-}
+  // GeoJSON を読み込む
+  fetch('countries.geojson')
+    .then(res => res.json())
+    .then(data => {
+      L.geoJSON(data, {
+        style: { color: '#555', weight: 1 },
+      }).addTo(map);
+    });
 </script>
+
 </body>
 </html>
