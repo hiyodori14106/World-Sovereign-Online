@@ -1,35 +1,291 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>仮想国家用世界地図</title>
-<style>
-  body { margin: 0; }
-  svg { width: 100vw; height: 100vh; }
-  path { fill: #cce5ff; stroke: #333; stroke-width: 0.5; cursor: pointer; transition: fill 0.2s; }
-  path:hover { fill: #6699ff; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マイ・バーチャル・ネイション</title>
+    <style>
+        /* デザイン設定 */
+        body {
+            font-family: 'Verdana', sans-serif;
+            background-color: #f0f4f8;
+            color: #333;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background: white;
+            width: 90%;
+            max-width: 600px;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        h1, h2 { margin-top: 0; }
+
+        /* 入力フォーム */
+        input, select, button {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            width: 80%;
+            font-size: 1rem;
+        }
+
+        button {
+            background-color: #4d97ff; /* Scratchブルー */
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            background-color: #3373cc;
+            transform: translateY(-2px);
+        }
+
+        button.action-btn {
+            width: 45%;
+            margin: 5px;
+            padding: 15px;
+        }
+
+        /* ゲーム画面（最初は非表示） */
+        #game-screen { display: none; }
+
+        .flag-preview {
+            width: 100px;
+            height: 60px;
+            margin: 0 auto 1rem;
+            border: 2px solid #333;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+        }
+
+        /* ステータス表示 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: #fafafa;
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        .stat-item {
+            padding: 10px;
+            border-bottom: 2px solid #eee;
+        }
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #4d97ff;
+        }
+
+        /* ログエリア */
+        #log-area {
+            height: 150px;
+            overflow-y: auto;
+            background: #333;
+            color: #00ff00;
+            font-family: monospace;
+            text-align: left;
+            padding: 10px;
+            margin-top: 20px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+        .log-entry { margin-bottom: 5px; border-bottom: 1px dashed #555; }
+
+        /* 色別スタイル */
+        .color-red { color: #ff4d4d; }
+        .color-green { color: #2ecc71; }
+    </style>
 </head>
 <body>
 
-<svg id="map" viewBox="0 0 2000 1001">
-  <!-- 国名非表示の国境パス例 -->
-  <path id="AF" d="M..."></path>
-  <path id="AL" d="M..."></path>
-  <path id="DZ" d="M..."></path>
-  <!-- 必要な国すべてを追加 -->
-</svg>
+    <div class="container">
+        <!-- 1. 建国画面 -->
+        <div id="setup-screen">
+            <h1>🏳️ 仮想国家メーカー</h1>
+            <p>あなたの国を作りましょう！</p>
+            
+            <input type="text" id="nation-name" placeholder="国の名前を入力 (例: スクラッチ帝国)" maxlength="15">
+            <br>
+            <label>国旗のメインカラー:</label>
+            <input type="color" id="nation-color" value="#ffab19">
+            <br>
+            <select id="gov-type">
+                <option value="共和制">共和制 (バランス型)</option>
+                <option value="軍事独裁">軍事独裁 (軍事力UP / 支持率DOWN)</option>
+                <option value="商業国家">商業国家 (資金UP / 軍事力DOWN)</option>
+            </select>
+            <br>
+            <button onclick="startGame()">建国する！</button>
+        </div>
 
-<script>
-// 仮想国家用クリックイベント
-document.querySelectorAll('#map path').forEach(path => {
-  path.addEventListener('click', () => {
-    // 色を変えて仮想国家として選択可能
-    path.style.fill = '#ff9999';
-    console.log('クリックされた国:', path.id);
-  });
-});
-</script>
+        <!-- 2. ゲームメイン画面 -->
+        <div id="game-screen">
+            <div id="flag-display" class="flag-preview"></div>
+            <h2 id="display-name-title"></h2>
+            <p>政体: <span id="display-gov"></span></p>
 
+            <!-- ステータス -->
+            <div class="stats-grid">
+                <div class="stat-item">💰 資金<br><span id="stat-money" class="stat-value">0</span></div>
+                <div class="stat-item">👥 人口<br><span id="stat-pop" class="stat-value">0</span></div>
+                <div class="stat-item">⚔️ 軍事力<br><span id="stat-power" class="stat-value">0</span></div>
+                <div class="stat-item">❤️ 支持率<br><span id="stat-approval" class="stat-value">0</span>%</div>
+            </div>
+
+            <!-- アクションボタン -->
+            <div>
+                <button class="action-btn" onclick="actionTax()">💸 税金徴収</button>
+                <button class="action-btn" onclick="actionInvest()">🏗️ 公共事業</button>
+                <button class="action-btn" onclick="actionMilitary()">🛡️ 軍事演習</button>
+                <button class="action-btn" onclick="actionPropaganda()">📺 プロパガンダ</button>
+            </div>
+
+            <!-- ログ -->
+            <div id="log-area">
+                <div class="log-entry">> システム起動... 準備完了</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 国のデータ
+        let nation = {
+            name: "",
+            color: "",
+            gov: "",
+            money: 1000,
+            population: 500,
+            power: 100,
+            approval: 80
+        };
+
+        // DOM要素の取得
+        const setupScreen = document.getElementById('setup-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const logArea = document.getElementById('log-area');
+
+        // ゲーム開始
+        function startGame() {
+            const nameInput = document.getElementById('nation-name').value;
+            if (!nameInput) {
+                alert("国の名前を入力してください！");
+                return;
+            }
+
+            nation.name = nameInput;
+            nation.color = document.getElementById('nation-color').value;
+            nation.gov = document.getElementById('gov-type').value;
+
+            // 政体ボーナス
+            if (nation.gov === "軍事独裁") {
+                nation.power += 200;
+                nation.approval -= 20;
+            } else if (nation.gov === "商業国家") {
+                nation.money += 1000;
+                nation.power -= 50;
+            }
+
+            // 画面切り替え
+            setupScreen.style.display = 'none';
+            gameScreen.style.display = 'block';
+
+            // 表示更新
+            document.getElementById('display-name-title').innerText = nation.name;
+            document.getElementById('display-gov').innerText = nation.gov;
+            document.getElementById('flag-display').style.backgroundColor = nation.color;
+            
+            addLog(`【祝】${nation.name} が建国されました！`);
+            updateUI();
+        }
+
+        // 画面の数字を更新
+        function updateUI() {
+            document.getElementById('stat-money').innerText = nation.money.toLocaleString();
+            document.getElementById('stat-pop').innerText = nation.population.toLocaleString();
+            document.getElementById('stat-power').innerText = nation.power.toLocaleString();
+            document.getElementById('stat-approval').innerText = nation.approval;
+            
+            // ゲームオーバー判定
+            if (nation.approval <= 0) {
+                alert("支持率が0になり、革命が起きました... ゲームオーバー！");
+                location.reload();
+            }
+        }
+
+        // ログ追加
+        function addLog(text) {
+            const div = document.createElement('div');
+            div.className = 'log-entry';
+            div.innerText = `> ${text}`;
+            logArea.prepend(div); // 新しいものを上に追加
+        }
+
+        // --- アクション機能 ---
+
+        // 1. 税金徴収
+        function actionTax() {
+            const gain = Math.floor(nation.population * 0.5); // 人口に応じた税収
+            nation.money += gain;
+            nation.approval -= 5; // 支持率ダウン
+            addLog(`税金を徴収しました。(+${gain}資金, -5支持率)`);
+            updateUI();
+        }
+
+        // 2. 公共事業
+        function actionInvest() {
+            if (nation.money < 500) {
+                alert("資金が足りません！");
+                return;
+            }
+            nation.money -= 500;
+            const popGain = Math.floor(Math.random() * 50) + 10;
+            nation.population += popGain;
+            nation.approval += 3;
+            addLog(`インフラ整備を行いました。(人口+${popGain}, 支持率+3)`);
+            updateUI();
+        }
+
+        // 3. 軍事演習
+        function actionMilitary() {
+            if (nation.money < 300) {
+                alert("資金が足りません！");
+                return;
+            }
+            nation.money -= 300;
+            const powerGain = Math.floor(Math.random() * 30) + 10;
+            nation.power += powerGain;
+            addLog(`軍事演習を実施しました。(軍事力+${powerGain})`);
+            updateUI();
+        }
+
+        // 4. プロパガンダ
+        function actionPropaganda() {
+            if (nation.money < 200) {
+                alert("資金が足りません！");
+                return;
+            }
+            nation.money -= 200;
+            nation.approval += 5;
+            if (nation.approval > 100) nation.approval = 100;
+            addLog(`政府広報を放送しました。(支持率回復)`);
+            updateUI();
+        }
+
+    </script>
 </body>
 </html>
