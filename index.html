@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>インタラクティブ世界地図</title>
+<title>インタラクティブ世界地図（デモ）</title>
 <style>
   body { margin: 0; }
   svg { width: 100vw; height: 100vh; }
@@ -12,24 +12,38 @@
 </head>
 <body>
 
-<!-- SVG 世界地図を埋め込む -->
-<svg viewBox="-180 -90 360 180">
-  <!-- 簡易的な大陸のパス例 -->
-  <path d="M-100,-20 L-80,-20 L-80,0 L-100,0 Z" title="北アメリカ"></path>
-  <path d="M-20,-10 L0,-10 L0,10 L-20,10 Z" title="南アメリカ"></path>
-  <path d="M40,-30 L80,-30 L80,10 L40,10 Z" title="アフリカ"></path>
-  <path d="M100,-10 L140,-10 L140,30 L100,30 Z" title="アジア"></path>
-  <path d="M140,-40 L180,-40 L180,-10 L140,-10 Z" title="オーストラリア"></path>
-  <path d="M-40,20 L20,20 L20,50 L-40,50 Z" title="ヨーロッパ"></path>
+<!-- テスト用矩形大陸 -->
+<svg id="map" viewBox="0 0 200 100">
+  <path d="M10,10 L60,10 L60,50 L10,50 Z"></path>
+  <path d="M70,20 L120,20 L120,60 L70,60 Z"></path>
+  <path d="M130,30 L180,30 L180,70 L130,70 Z"></path>
 </svg>
 
 <script>
-  // 各大陸をクリックしたときに名前を表示
-  document.querySelectorAll('path').forEach(path => {
+const map = document.getElementById('map');
+
+// 後で仮想国家機能を追加できるようにクリックイベントを空にしておく
+map.querySelectorAll('path').forEach(path => {
+  path.addEventListener('click', () => {
+    // 仮想国家処理追加用
+    console.log('矩形クリック', path);
+  });
+});
+
+// --- 例: 国境入りSVGを後で読み込む関数 ---
+function loadSVGWorldMap(svgContent) {
+  map.innerHTML = svgContent;
+
+  // 新しいパスにクリックイベントを追加
+  map.querySelectorAll('path').forEach(path => {
     path.addEventListener('click', () => {
-      alert('選択された地域: ' + path.getAttribute('title'));
+      // 仮想国家処理追加用
+      console.log('国境SVGクリック', path);
     });
   });
+}
+
+// 例: 後で fetch などでSVGを読み込んで loadSVGWorldMap に渡せば置き換え可能
 </script>
 
 </body>
