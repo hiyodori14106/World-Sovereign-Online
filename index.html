@@ -3,24 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Global Nations Online - Perfect Layout</title>
+  <title>Global Nations - Perfect Tabs</title>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <style>
     :root {
-      --bg-body: #f3f4f6;
+      --bg-body: #f1f5f9;
       --bg-sidebar: #0f172a;
       --bg-card: #ffffff;
       --text-main: #334155;
       --text-muted: #94a3b8;
       --primary: #3b82f6;
-      --primary-hover: #2563eb;
       --accent: #f59e0b;
       --danger: #ef4444;
       --success: #10b981;
       --border: #e2e8f0;
-      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
 
     * { box-sizing: border-box; }
@@ -30,31 +29,29 @@
       background-color: var(--bg-body);
       color: var(--text-main);
       margin: 0;
-      overflow: hidden; /* 画面全体のスクロールを禁止 */
+      overflow: hidden; /* 全体スクロール禁止 */
       height: 100vh;
       display: flex;
     }
 
     /* --- サイドバー --- */
     .sidebar {
-      width: 280px;
+      width: 260px;
       background-color: var(--bg-sidebar);
       color: white;
       display: flex;
       flex-direction: column;
       padding: 20px;
-      box-shadow: 4px 0 15px rgba(0,0,0,0.1);
       z-index: 20;
       flex-shrink: 0;
     }
 
     .brand {
-      font-size: 1.5rem;
+      font-size: 1.4rem;
       font-weight: 900;
       color: var(--primary);
       margin-bottom: 20px;
       text-align: center;
-      letter-spacing: 1px;
     }
     .brand span { color: white; }
 
@@ -69,14 +66,9 @@
     #disp-name { margin: 10px 0 5px; font-size: 1.1rem; font-weight: 800; }
     
     .flag-display {
-      width: 80px;
-      height: 50px;
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: repeat(8, 1fr);
-      grid-template-rows: repeat(5, 1fr);
-      border: 2px solid white;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      width: 80px; height: 50px; margin: 0 auto;
+      display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(5, 1fr);
+      border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
     }
 
     .stat-list { flex: 1; overflow-y: auto; padding-right: 5px; }
@@ -88,74 +80,55 @@
     .stat-icon { width: 25px; color: var(--text-muted); text-align: center; }
 
     .sidebar-footer {
-      margin-top: auto;
-      padding-top: 20px;
-      text-align: center;
-      font-size: 0.75rem;
-      color: var(--text-muted);
+      margin-top: auto; padding-top: 20px; text-align: center; font-size: 0.75rem; color: var(--text-muted);
     }
 
-    /* --- メインレイアウト --- */
+    /* --- メインコンテンツ --- */
     .main-content {
       flex: 1;
       display: flex;
       flex-direction: column;
       background: #f8fafc;
       min-width: 0;
-      height: 100%;
-    }
-
-    .news-ticker {
-      flex: 0 0 auto;
-      background: #0f172a;
-      color: #10b981;
-      font-family: monospace;
-      padding: 8px 15px;
-      font-size: 0.85rem;
-      white-space: nowrap;
-      overflow: hidden;
-      border-bottom: 1px solid var(--border);
+      height: 100vh;
     }
 
     header {
       flex: 0 0 auto;
       background: var(--bg-card);
       padding: 15px 30px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      display: flex; justify-content: space-between; align-items: center;
       border-bottom: 1px solid var(--border);
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
     header h3 { margin: 0; font-weight: 800; color: var(--bg-sidebar); font-size: 1.3rem; }
     .total-score {
       background: var(--bg-body); padding: 8px 16px; border-radius: 8px; font-weight: bold; border: 1px solid var(--border);
     }
-    .total-score b { color: var(--primary); font-size: 1.1rem; }
 
+    /* --- タブ切り替えボタン --- */
     .tabs {
       flex: 0 0 auto;
       display: flex;
       background: white;
       padding: 0 20px;
-      box-shadow: 0 4px 6px -4px rgba(0,0,0,0.1);
-      z-index: 15;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      z-index: 10;
     }
     .tab-btn {
       flex: 1; padding: 15px; border: none; background: transparent;
       font-family: 'Nunito', sans-serif; font-weight: 700; color: var(--text-muted);
-      cursor: pointer; position: relative; transition: all 0.3s;
+      cursor: pointer; position: relative; transition: all 0.2s;
     }
     .tab-btn:hover { color: var(--primary); background: #f1f5f9; }
-    .tab-btn.active { color: var(--primary); }
+    .tab-btn.active { color: var(--primary); background: #eff6ff; }
     .tab-btn.active::after {
       content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 3px;
-      background: var(--primary); border-radius: 3px 3px 0 0;
+      background: var(--primary);
     }
 
-    /* --- スクロールエリア (ここが修正ポイント) --- */
+    /* --- パネルコンテナ (ここが重要: 独立スクロール) --- */
     #panel-container {
-      flex: 1; /* 残りの高さを全て使う */
+      flex: 1;
       position: relative;
       overflow: hidden; /* コンテナ自体はスクロールしない */
     }
@@ -165,49 +138,44 @@
       top: 0; left: 0; right: 0; bottom: 0;
       padding: 20px;
       overflow-y: auto; /* 中身だけスクロール */
-      display: none;
-      padding-bottom: 50px; /* 下部の余白 */
+      display: none; /* 初期状態は非表示 */
+      padding-bottom: 80px;
     }
+    
+    /* アクティブなパネルだけ表示 */
     .panel.active { display: block; animation: fadeIn 0.3s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-    /* カードデザイン */
+    /* UIパーツ */
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
     .card {
-      background: var(--bg-card);
-      border-radius: 16px;
-      padding: 20px;
-      margin-bottom: 20px;
-      box-shadow: var(--shadow);
-      border: 1px solid var(--border);
+      background: var(--bg-card); border-radius: 12px; padding: 20px; margin-bottom: 20px;
+      box-shadow: var(--shadow); border: 1px solid var(--border);
     }
     .card h4 {
-      margin-top: 0; margin-bottom: 15px;
-      color: var(--bg-sidebar);
+      margin-top: 0; margin-bottom: 15px; color: var(--bg-sidebar);
       font-size: 1.05rem; border-left: 4px solid var(--primary); padding-left: 10px;
     }
 
     button {
       background: var(--primary); color: white; border: none; padding: 12px;
       border-radius: 8px; font-weight: 700; cursor: pointer; width: 100%;
-      margin-bottom: 8px; transition: all 0.2s; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);
+      margin-bottom: 8px; transition: 0.2s; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
     }
     button:hover { transform: translateY(-1px); }
-    button.danger { background: var(--danger); box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3); }
+    button.danger { background: var(--danger); box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3); }
     button.secondary { background: #64748b; box-shadow: none; }
     
     input[type="text"], input[type="range"] {
-      width: 100%; padding: 10px; border-radius: 8px;
-      border: 1px solid var(--border); background: #f8fafc; outline: none;
+      width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: #f8fafc;
     }
 
-    /* マップ */
+    /* マップ専用スタイル */
     .map-wrapper { text-align: center; }
     .map-container {
       display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
       background: #334155; padding: 10px; border-radius: 12px;
       max-width: 400px; margin: 0 auto;
-      min-height: 200px; /* マップが表示されないバグ対策 */
     }
     .map-tile {
       aspect-ratio: 1 / 1; background-color: #cbd5e1; border-radius: 4px;
@@ -215,6 +183,7 @@
       position: relative; border-bottom: 3px solid rgba(0,0,0,0.2);
     }
     .map-tile:hover { transform: scale(1.05); z-index: 5; border-color: white; }
+    .map-tile:active { transform: scale(0.95); border-bottom-width: 0; margin-top: 3px; }
     .map-legend { font-size: 0.8rem; color: var(--text-muted); margin-top: 10px; }
 
     /* チャット & ランキング */
@@ -228,7 +197,6 @@
     }
     .chat-time { font-size: 0.7rem; color: #94a3b8; margin-right: 8px; }
     
-    #leaderboard { max-height: 350px; overflow-y: auto; }
     .rank-item {
       display: flex; justify-content: space-between; align-items: center;
       padding: 10px; border-bottom: 1px solid var(--border);
@@ -255,7 +223,7 @@
     .color-btn {
       width: 28px; height: 28px; border-radius: 50%; border: 2px solid #e2e8f0; cursor: pointer;
     }
-    .color-btn.selected { border-color: #334155; transform: scale(1.2); }
+    .color-btn.selected { border-color: #334155; transform: scale(1.2); box-shadow: 0 0 0 2px #cbd5e1; }
     .hidden { display: none !important; }
 
     ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -264,7 +232,7 @@
 </head>
 <body>
 
-  <!-- 建国モーダル -->
+  <!-- 建国モーダル (初回のみ表示) -->
   <div id="modal-overlay">
     <div class="modal-box">
       <h1 style="color:var(--bg-sidebar); margin:0 0 10px 0;">Global Nations</h1>
@@ -311,30 +279,28 @@
       </div>
     </div>
 
-    <!-- メイン -->
+    <!-- メインコンテンツ -->
     <div class="main-content">
-      <div class="news-ticker">
-        <i class="fas fa-broadcast-tower"></i> <span id="news-text" style="margin-left:10px;">国際ネットワークに接続中...</span>
-      </div>
       
       <header>
         <h3 id="panel-title"><i class="fas fa-home"></i> ダッシュボード</h3>
         <div class="total-score">
-          国力スコア: <b id="my-total-score">0</b>
+          国力: <b id="my-total-score">0</b>
         </div>
       </header>
 
+      <!-- タブボタン -->
       <div class="tabs">
-        <button class="tab-btn active" id="btn-dashboard" onclick="switchTab('dashboard')"><i class="fas fa-chart-pie"></i> 内政</button>
+        <button class="tab-btn active" id="btn-dashboard" onclick="switchTab('dashboard')"><i class="fas fa-chart-pie"></i> 内政 (Dashboard)</button>
         <button class="tab-btn" id="btn-economy" onclick="switchTab('economy')"><i class="fas fa-hand-holding-usd"></i> 経済</button>
-        <button class="tab-btn" id="btn-map" onclick="switchTab('map')"><i class="fas fa-map-marked-alt"></i> 地図</button>
+        <button class="tab-btn" id="btn-map" onclick="switchTab('map')"><i class="fas fa-map-marked-alt"></i> 地図 (Map)</button>
         <button class="tab-btn" id="btn-diplomacy" onclick="switchTab('diplomacy')"><i class="fas fa-globe"></i> 外交</button>
       </div>
 
-      <!-- パネルエリア (スクロール対応) -->
+      <!-- パネルコンテナ (コンテンツエリア) -->
       <div id="panel-container">
         
-        <!-- 1. ダッシュボード -->
+        <!-- 1. ダッシュボード (内政) -->
         <div id="tab-dashboard" class="panel active">
           <div class="card">
             <h4><i class="fas fa-poll"></i> 国民支持率</h4>
@@ -387,7 +353,7 @@
           </div>
         </div>
 
-        <!-- 3. マップ & 戦争 -->
+        <!-- 3. マップ & 戦争 (完全に独立したタブ) -->
         <div id="tab-map" class="panel">
           <div class="grid-2">
               <div class="card map-wrapper">
@@ -397,7 +363,6 @@
                   </div>
                   
                   <div class="map-container" id="world-map">
-                      <!-- 初期表示用の空マス (データ受信まで表示) -->
                       <div style="grid-column:1/-1; text-align:center; padding:50px; color:#fff;">読み込み中...</div>
                   </div>
                   <div class="map-legend">
@@ -442,8 +407,11 @@
   </div>
 
   <script>
+    // ============================================
+    // ▼ 設定 & データ
+    // ============================================
     const PANTRY_ID = "9C9B3581-6D5B-48A0-8C04-d32DBFE128A8"; 
-    const BASKET_NAME = "global_nations_v9_layoutfix"; // 新規バスケットでクリーンスタート
+    const BASKET_NAME = "global_nations_v11_fix";
     const API_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/${BASKET_NAME}`;
 
     let editColor = "#3b82f6";
@@ -474,26 +442,31 @@
         battles: [] 
     }; 
 
+    // --- 初期化 (自動ログイン機能) ---
     window.onload = function() {
       initFlagEditor();
       
-      // 自動ログイン処理
-      if(localStorage.getItem("gn_save_v9")) {
-        const saved = JSON.parse(localStorage.getItem("gn_save_v9"));
-        gameData = {...gameData, ...saved};
-        flagPixels = gameData.flag || new Array(40).fill("#ffffff");
-        
-        // モーダルを隠してメイン画面を表示
-        document.getElementById('modal-overlay').classList.add('hidden');
-        document.getElementById('app').classList.remove('hidden');
-        
-        updateUI();
-        startGameLoop();
-        syncWithCloud(true);
-        syncTimer = setInterval(() => syncWithCloud(false), 5000);
+      if(localStorage.getItem("gn_save_v11")) {
+        try {
+          const saved = JSON.parse(localStorage.getItem("gn_save_v11"));
+          gameData = {...gameData, ...saved};
+          flagPixels = gameData.flag || new Array(40).fill("#ffffff");
+          
+          document.getElementById('modal-overlay').classList.add('hidden');
+          document.getElementById('app').classList.remove('hidden');
+          
+          addLog("おかえりなさい！ゲームを再開します。");
+          updateUI();
+          startGameLoop();
+          syncWithCloud(true);
+          syncTimer = setInterval(() => syncWithCloud(false), 5000);
+        } catch(e) {
+          console.error("Save load error", e);
+        }
       }
     };
 
+    // --- タブ切り替え ---
     function switchTab(tabName) {
         document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
         const targetPanel = document.getElementById('tab-' + tabName);
@@ -512,6 +485,7 @@
         document.getElementById('panel-title').innerHTML = titles[tabName];
     }
 
+    // --- 国旗エディタ ---
     function initFlagEditor() {
       const p = document.getElementById('palette');
       colors.forEach(c => {
@@ -559,6 +533,7 @@
         });
     }
 
+    // --- ゲーム開始 (手動) ---
     function startGame() {
       const name = document.getElementById('inp-name').value;
       if(!name) return alert("国名を入力してください。");
@@ -569,7 +544,7 @@
       document.getElementById('modal-overlay').classList.add('hidden');
       document.getElementById('app').classList.remove('hidden');
       
-      addLog("建国されました。");
+      addLog("建国が完了しました。");
       updateUI();
       startGameLoop();
       
@@ -577,6 +552,7 @@
       syncTimer = setInterval(() => syncWithCloud(false), 5000);
     }
 
+    // --- クラウド同期 ---
     async function syncWithCloud(isFirstTime) {
       try {
         const res = await fetch(API_URL);
@@ -620,6 +596,7 @@
       } catch(e) { console.error("Sync Error", e); }
     }
 
+    // --- 戦闘処理 (オフライン戦闘の解決) ---
     function processPendingBattles() {
         if(!cloudData.battles) return;
         const myBattles = cloudData.battles.filter(b => b.defender === gameData.name);
@@ -661,6 +638,7 @@
         if(battleHappened) { updateUI(); }
     }
 
+    // --- マップ描画 ---
     function renderMap() {
         const container = document.getElementById('world-map');
         container.innerHTML = "";
@@ -694,7 +672,7 @@
 
     function handleMapClick(index, tile) {
         if(!tile || !tile.owner) {
-            if(gameData.money < 300) return alert("領有費用: 300");
+            if(gameData.money < 300) return alert("領有費用: 300資金が必要です。");
             if(confirm("この空き地を領有しますか？ (費用: 300)")) {
                 gameData.money -= 300;
                 cloudData.map[index] = { owner: gameData.name, flag: gameData.flag };
@@ -814,10 +792,9 @@
         if(gameData.food < 0) { gameData.food = 0; gameData.pop -= 5; gameData.app -= 5; }
         if(gameData.tax > 30) gameData.app--; else if(gameData.tax < 15) gameData.app++;
         if(gameData.app > 100) gameData.app = 100;
-        if(gameData.app <= 0) { gameData.money = Math.floor(gameData.money/2); gameData.app=50; addLog("暴動発生！資金半減"); }
-        
+        if(gameData.app <= 0) { gameData.money = Math.floor(gameData.money/2); gameData.app=50; addLog("暴動発生！支持率低下により資金が半減しました。"); }
         updateUI();
-        localStorage.setItem("gn_save_v9", JSON.stringify(gameData));
+        localStorage.setItem("gn_save_v11", JSON.stringify(gameData));
       }, 3000);
     }
 
