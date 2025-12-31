@@ -3,25 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Global Nations Online - Ep.4 Design</title>
+  <title>Global Nations Online - Flag Edition</title>
   <!-- Google Fonts: ゲームらしいフォント -->
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
-  <!-- FontAwesome: アイコン用 (CDN) -->
+  <!-- FontAwesome: アイコン用 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <style>
     :root {
-      /* モダンなカラーパレット */
+      /* カラーパレット */
       --bg-body: #f3f4f6;
       --bg-sidebar: #1e293b;
       --bg-card: #ffffff;
       --text-main: #334155;
       --text-muted: #94a3b8;
-      --primary: #3b82f6; /* Bright Blue */
+      --primary: #3b82f6;
       --primary-hover: #2563eb;
-      --accent: #f59e0b; /* Amber/Gold */
-      --danger: #ef4444; /* Red */
-      --success: #10b981; /* Emerald */
+      --accent: #f59e0b;
+      --danger: #ef4444;
+      --success: #10b981;
       --border: #e2e8f0;
       --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     }
@@ -29,7 +29,7 @@
     * { box-sizing: border-box; }
 
     body {
-      font-family: 'Nunito', sans-serif;
+      font-family: 'Nunito', "Helvetica Neue", Arial, sans-serif;
       background-color: var(--bg-body);
       color: var(--text-main);
       margin: 0;
@@ -68,7 +68,19 @@
       text-align: center;
     }
     #disp-name { margin: 10px 0 5px; font-size: 1.2rem; }
-    #disp-flag { width: 60px; height: 40px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); display: inline-block; border: 2px solid white; }
+    
+    /* 国旗表示用コンテナ */
+    .flag-display {
+      width: 80px;
+      height: 50px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      grid-template-rows: repeat(5, 1fr);
+      border: 2px solid white;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+    .flag-pixel { width: 100%; height: 100%; }
 
     .stat-list { flex: 1; overflow-y: auto; }
     .stat-row {
@@ -105,7 +117,7 @@
     .news-ticker {
       background: #0f172a;
       color: #10b981;
-      font-family: 'Courier New', monospace;
+      font-family: monospace;
       padding: 8px 15px;
       font-size: 0.9rem;
       white-space: nowrap;
@@ -278,7 +290,7 @@
     .rank-myself { background-color: #e0f2fe; border-left: 3px solid var(--primary); }
     .status-dot { font-size: 0.6rem; margin-right: 6px; }
 
-    /* モーダル */
+    /* --- モーダル & 国旗エディタ --- */
     #modal-overlay {
       position: fixed; inset: 0;
       background: rgba(15, 23, 42, 0.8);
@@ -287,11 +299,33 @@
       z-index: 1000;
     }
     .modal-box {
-      background: white; padding: 40px; border-radius: 20px; width: 400px; text-align: center;
+      background: white; padding: 30px; border-radius: 20px; width: 450px; text-align: center;
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-      animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
-    @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    
+    /* エディタ用グリッド */
+    .editor-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      grid-template-rows: repeat(5, 1fr);
+      gap: 1px;
+      background: #ccc;
+      width: 200px;
+      height: 125px;
+      margin: 10px auto;
+      border: 4px solid #333;
+    }
+    .editor-pixel {
+      background-color: white;
+      cursor: pointer;
+    }
+    .color-palette {
+      display: flex; justify-content: center; gap: 10px; margin-bottom: 10px;
+    }
+    .color-btn {
+      width: 30px; height: 30px; border-radius: 50%; border: 2px solid #ddd; cursor: pointer;
+    }
+    .color-btn.selected { border-color: #333; transform: scale(1.1); }
 
     .hidden { display: none !important; }
     
@@ -300,7 +334,6 @@
     ::-webkit-scrollbar-track { background: #f1f1f1; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-
   </style>
 </head>
 <body>
@@ -308,23 +341,27 @@
   <!-- 建国モーダル -->
   <div id="modal-overlay">
     <div class="modal-box">
-      <div style="font-size:3rem; margin-bottom:10px;">🌍</div>
       <h1 style="color:var(--bg-sidebar); margin:0;">Global Nations</h1>
-      <p style="color:var(--text-muted);">Create your empire. Dominate the map.</p>
+      <p style="color:var(--text-muted);">建国して世界を征服しよう</p>
       
-      <div style="text-align:left; margin:20px 0;">
-        <label style="font-size:0.9rem; font-weight:bold; color:var(--text-main);">Country Name</label>
-        <input type="text" id="inp-name" placeholder="Ex: Scratch Empire" maxlength="12">
-        <br><br>
-        <label style="font-size:0.9rem; font-weight:bold; color:var(--text-main);">Flag Color</label>
-        <div style="display:flex; gap:10px; align-items:center;">
-            <input type="color" id="inp-color" value="#3b82f6" style="width:50px; height:40px; padding:0; border:none; border-radius:4px; cursor:pointer;">
-            <span style="font-size:0.8rem; color:#666;">Choose your territory color</span>
+      <div style="text-align:left; margin:10px 0;">
+        <label style="font-size:0.9rem; font-weight:bold;">国名</label>
+        <input type="text" id="inp-name" placeholder="例: スクラッチ帝国" maxlength="12">
+        
+        <div style="margin-top:15px; text-align:center;">
+          <label style="font-size:0.9rem; font-weight:bold;">国旗デザイン</label>
+          <div class="color-palette" id="palette">
+             <!-- JSで生成 -->
+          </div>
+          <div class="editor-grid" id="flag-editor">
+             <!-- JSで生成 (8x5) -->
+          </div>
+          <p style="font-size:0.7rem; color:#666;">クリックで色を塗る / 色を選んで変更</p>
         </div>
       </div>
       
-      <button onclick="startGame()" style="font-size:1.1rem; padding:15px;">🚀 START GAME</button>
-      <p style="font-size: 0.7rem; color: var(--text-muted); margin-top:10px;">Data autosaves to the Cloud.</p>
+      <button onclick="startGame()" style="font-size:1.1rem; padding:12px;">🚀 建国する</button>
+      <p style="font-size: 0.7rem; color: var(--text-muted); margin-top:5px;">データはクラウドに自動保存されます。</p>
     </div>
   </div>
 
@@ -334,51 +371,52 @@
       <div class="brand">GLOBAL <span>NATIONS</span></div>
       
       <div class="nation-info">
-        <div id="disp-flag"></div>
+        <!-- ドット絵国旗を表示 -->
+        <div id="disp-flag" class="flag-display"></div>
         <h2 id="disp-name">Unknown</h2>
         <div class="game-date" id="game-date">Day 1</div>
       </div>
       
       <div class="stat-list">
-        <div class="stat-row"><span class="stat-icon"><i class="fas fa-coins"></i></span> <span>Funds</span> <span class="stat-val" id="val-money">0</span></div>
-        <div class="stat-row"><span class="stat-icon"><i class="fas fa-users"></i></span> <span>Pop</span> <span class="stat-val" id="val-pop">0</span></div>
-        <div class="stat-row"><span class="stat-icon"><i class="fas fa-hamburger"></i></span> <span>Food</span> <span class="stat-val" id="val-food">0</span></div>
-        <div class="stat-row"><span class="stat-icon"><i class="fas fa-oil-can"></i></span> <span>Oil</span> <span class="stat-val" id="val-oil">0</span></div>
-        <div class="stat-row"><span class="stat-icon"><i class="fas fa-cubes"></i></span> <span>Mat</span> <span class="stat-val" id="val-mat">0</span></div>
-        <div class="stat-row"><span class="stat-icon"><i class="fas fa-fighter-jet"></i></span> <span>Military</span> <span class="stat-val" id="val-mil">0</span></div>
-        <div class="stat-row"><span class="stat-icon"><i class="fas fa-heart"></i></span> <span>Approval</span> <span class="stat-val" id="val-app">0%</span></div>
+        <div class="stat-row"><span class="stat-icon"><i class="fas fa-coins"></i></span> <span>資金</span> <span class="stat-val" id="val-money">0</span></div>
+        <div class="stat-row"><span class="stat-icon"><i class="fas fa-users"></i></span> <span>人口</span> <span class="stat-val" id="val-pop">0</span></div>
+        <div class="stat-row"><span class="stat-icon"><i class="fas fa-hamburger"></i></span> <span>食料</span> <span class="stat-val" id="val-food">0</span></div>
+        <div class="stat-row"><span class="stat-icon"><i class="fas fa-oil-can"></i></span> <span>石油</span> <span class="stat-val" id="val-oil">0</span></div>
+        <div class="stat-row"><span class="stat-icon"><i class="fas fa-cubes"></i></span> <span>資材</span> <span class="stat-val" id="val-mat">0</span></div>
+        <div class="stat-row"><span class="stat-icon"><i class="fas fa-fighter-jet"></i></span> <span>軍事力</span> <span class="stat-val" id="val-mil">0</span></div>
+        <div class="stat-row"><span class="stat-icon"><i class="fas fa-heart"></i></span> <span>支持率</span> <span class="stat-val" id="val-app">0%</span></div>
       </div>
 
       <div class="sidebar-footer">
-        <i class="fas fa-cloud-upload-alt"></i> Auto-Sync Active
+        <i class="fas fa-cloud-upload-alt"></i> 自動同期中
       </div>
     </div>
 
     <!-- メイン -->
     <div class="main-content">
       <div class="news-ticker">
-        <i class="fas fa-broadcast-tower"></i> <span id="news-text" style="margin-left:10px;">Connecting to global satellite network...</span>
+        <i class="fas fa-broadcast-tower"></i> <span id="news-text" style="margin-left:10px;">国際ネットワークに接続中...</span>
       </div>
       
       <header>
-        <h3 id="panel-title"><i class="fas fa-home"></i> Dashboard</h3>
+        <h3 id="panel-title"><i class="fas fa-home"></i> ダッシュボード</h3>
         <div class="total-score">
-          Score: <b id="my-total-score">0</b>
+          国力スコア: <b id="my-total-score">0</b>
         </div>
       </header>
 
       <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('dashboard')"><i class="fas fa-chart-pie"></i> Domestic</button>
-        <button class="tab-btn" onclick="switchTab('economy')"><i class="fas fa-hand-holding-usd"></i> Economy</button>
-        <button class="tab-btn" onclick="switchTab('map')"><i class="fas fa-map-marked-alt"></i> War Map</button>
-        <button class="tab-btn" onclick="switchTab('diplomacy')"><i class="fas fa-globe"></i> Global</button>
+        <button class="tab-btn active" onclick="switchTab('dashboard')"><i class="fas fa-chart-pie"></i> 内政</button>
+        <button class="tab-btn" onclick="switchTab('economy')"><i class="fas fa-hand-holding-usd"></i> 経済</button>
+        <button class="tab-btn" onclick="switchTab('map')"><i class="fas fa-map-marked-alt"></i> 地図・戦争</button>
+        <button class="tab-btn" onclick="switchTab('diplomacy')"><i class="fas fa-globe"></i> 外交</button>
       </div>
 
-      <!-- 1. Dashboard -->
+      <!-- 1. ダッシュボード -->
       <div id="tab-dashboard" class="panel active">
         <div class="card">
-          <h4><i class="fas fa-poll"></i> Public Approval</h4>
-          <p id="status-report" style="color:#64748b;">The nation is currently stable.</p>
+          <h4><i class="fas fa-poll"></i> 国民支持率</h4>
+          <p id="status-report" style="color:#64748b;">国家運営は順調です。</p>
           <div style="background:#e2e8f0; height:12px; border-radius:6px; margin-top:10px; overflow:hidden;">
             <div id="approval-bar" style="width: 50%; background: var(--success); height:100%; transition: width 0.5s;"></div>
           </div>
@@ -386,88 +424,88 @@
 
         <div class="grid-2">
           <div class="card">
-            <h4><i class="fas fa-hard-hat"></i> Development</h4>
-            <p style="font-size:0.9rem;">Invest in infrastructure to grow population.</p>
-            <button onclick="actionInvest()">Build Infra (💰500, 🧱10)</button>
+            <h4><i class="fas fa-hard-hat"></i> 公共事業</h4>
+            <p style="font-size:0.9rem;">インフラを整備して人口を増やします。</p>
+            <button onclick="actionInvest()">インフラ整備 (💰500, 🧱10)</button>
           </div>
           <div class="card">
-            <h4><i class="fas fa-bullhorn"></i> Media</h4>
-            <p style="font-size:0.9rem;">Broadcast propaganda to boost approval.</p>
-            <button onclick="actionPropaganda()">Broadcast (💰200)</button>
+            <h4><i class="fas fa-bullhorn"></i> メディア戦略</h4>
+            <p style="font-size:0.9rem;">プロパガンダ放送で支持率を回復します。</p>
+            <button onclick="actionPropaganda()">放送実施 (💰200)</button>
           </div>
         </div>
         
         <div class="card">
-          <h4><i class="fas fa-list-alt"></i> System Logs</h4>
-          <div id="log-list" style="font-size:0.85rem; color:#64748b; height:120px; overflow-y:auto; font-family:'Courier New', monospace;"></div>
+          <h4><i class="fas fa-list-alt"></i> システムログ</h4>
+          <div id="log-list" style="font-size:0.85rem; color:#64748b; height:120px; overflow-y:auto; font-family:monospace;"></div>
         </div>
       </div>
 
-      <!-- 2. Economy -->
+      <!-- 2. 経済 -->
       <div id="tab-economy" class="panel">
         <div class="card">
-          <h4><i class="fas fa-percentage"></i> Tax Rate: <span id="tax-disp" style="color:var(--primary);">20</span>%</h4>
+          <h4><i class="fas fa-percentage"></i> 税率: <span id="tax-disp" style="color:var(--primary);">20</span>%</h4>
           <input type="range" id="tax-slider" min="0" max="50" value="20" oninput="updateTaxDisp()">
-          <p style="font-size:0.8rem; color:#94a3b8; margin-top:5px;">Higher taxes increase income but lower approval.</p>
+          <p style="font-size:0.8rem; color:#94a3b8; margin-top:5px;">税率が高いと収入が増えますが、支持率が下がります。</p>
         </div>
 
         <div class="grid-2">
           <div class="card">
-            <h4><i class="fas fa-shopping-cart"></i> Resource Market</h4>
-            <button class="secondary" onclick="buyResource('food', 100, 50)"><i class="fas fa-hamburger"></i> Buy Food (💰100)</button>
-            <button class="secondary" onclick="buyResource('oil', 200, 20)"><i class="fas fa-oil-can"></i> Buy Oil (💰200)</button>
-            <button class="secondary" onclick="buyResource('mat', 150, 30)"><i class="fas fa-cubes"></i> Buy Material (💰150)</button>
+            <h4><i class="fas fa-shopping-cart"></i> 資源市場</h4>
+            <button class="secondary" onclick="buyResource('food', 100, 50)"><i class="fas fa-hamburger"></i> 食料購入 (💰100)</button>
+            <button class="secondary" onclick="buyResource('oil', 200, 20)"><i class="fas fa-oil-can"></i> 石油購入 (💰200)</button>
+            <button class="secondary" onclick="buyResource('mat', 150, 30)"><i class="fas fa-cubes"></i> 資材購入 (💰150)</button>
           </div>
           <div class="card">
-            <h4><i class="fas fa-university"></i> World Bank</h4>
-            <p>Current Debt: <span id="val-debt" style="color:var(--danger); font-weight:bold;">0</span></p>
-            <button onclick="takeLoan()">Borrow 💰1000</button>
-            <button onclick="repayLoan()" style="background:var(--success);">Repay 💰1100</button>
+            <h4><i class="fas fa-university"></i> 世界銀行</h4>
+            <p>現在の借金: <span id="val-debt" style="color:var(--danger); font-weight:bold;">0</span></p>
+            <button onclick="takeLoan()">借入 💰1000</button>
+            <button onclick="repayLoan()" style="background:var(--success);">返済 💰1100</button>
           </div>
         </div>
       </div>
 
-      <!-- 3. Map & War -->
+      <!-- 3. マップ & 戦争 -->
       <div id="tab-map" class="panel">
         <div class="grid-2">
             <div class="card map-wrapper">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <h4 style="margin:0;"><i class="fas fa-map"></i> Territory</h4>
+                    <h4 style="margin:0;"><i class="fas fa-map"></i> 領土マップ</h4>
                     <button style="width:auto; padding:5px 10px; font-size:0.8rem;" onclick="syncWithCloud(false)"><i class="fas fa-sync"></i></button>
                 </div>
                 
                 <div class="map-container" id="world-map"></div>
                 <div class="map-legend">
-                    <span style="margin-right:10px;"><i class="fas fa-square" style="color:#cbd5e1;"></i> Empty (💰300)</span>
-                    <span><i class="fas fa-star" style="color:#fbbf24;"></i> You</span>
+                    <span style="margin-right:10px;"><i class="fas fa-square" style="color:#cbd5e1;"></i> 空き地 (💰300)</span>
+                    <span><i class="fas fa-star" style="color:#fbbf24;"></i> 自国領</span>
                 </div>
             </div>
 
             <div class="card">
-                <h4><i class="fas fa-shield-alt"></i> Military Command</h4>
-                <p style="font-size:0.9rem; color:#64748b;">Attack occupied territories to expand.</p>
-                <button onclick="recruit()" class="secondary"><i class="fas fa-user-plus"></i> Recruit (💰200 -> ⚔️20)</button>
-                <button onclick="train()" class="secondary"><i class="fas fa-dumbbell"></i> Train (💰300 -> ⚔️50)</button>
+                <h4><i class="fas fa-shield-alt"></i> 軍司令部</h4>
+                <p style="font-size:0.9rem; color:#64748b;">他国の領土を攻撃して拡大します。</p>
+                <button onclick="recruit()" class="secondary"><i class="fas fa-user-plus"></i> 徴兵 (💰200 -> ⚔️20)</button>
+                <button onclick="train()" class="secondary"><i class="fas fa-dumbbell"></i> 訓練 (💰300 -> ⚔️50)</button>
                 <div style="margin-top:20px; border-top:1px solid #eee; padding-top:10px;">
-                    <button onclick="buildDefense()"><i class="fas fa-dungeon"></i> Fortify Defense (💰1k)</button>
+                    <button onclick="buildDefense()"><i class="fas fa-dungeon"></i> 防衛強化 (💰1000, 🧱100)</button>
                 </div>
-                <p style="font-size:0.8rem; color:#ef4444; margin-top:10px;">*Attacking offline players queues a delayed battle.</p>
+                <p style="font-size:0.8rem; color:#ef4444; margin-top:10px;">※オフラインの相手への攻撃は、相手のログイン時に戦闘が発生します。</p>
             </div>
         </div>
       </div>
 
-      <!-- 4. Diplomacy -->
+      <!-- 4. 外交 -->
       <div id="tab-diplomacy" class="panel">
         <div class="grid-2">
           <div class="card">
-            <h4><i class="fas fa-trophy"></i> Leaderboard</h4>
-            <div id="leaderboard">Loading...</div>
+            <h4><i class="fas fa-trophy"></i> 世界ランキング</h4>
+            <div id="leaderboard">読み込み中...</div>
           </div>
           <div class="card">
-            <h4><i class="fas fa-comments"></i> Global Chat</h4>
+            <h4><i class="fas fa-comments"></i> 国際チャット</h4>
             <div class="chat-area" id="global-chat"></div>
             <div style="display:flex;">
-              <input type="text" id="chat-input" placeholder="Type a message..." style="flex:1;">
+              <input type="text" id="chat-input" placeholder="メッセージを入力..." style="flex:1;">
               <button onclick="sendChat()" style="width:auto; margin-left:10px; margin-bottom:0;"><i class="fas fa-paper-plane"></i></button>
             </div>
           </div>
@@ -479,15 +517,20 @@
 
   <script>
     // ============================================
-    // ▼ LOGIC (Unchanged functionality)
+    // ▼ 設定 & データ
     // ============================================
     const PANTRY_ID = "9C9B3581-6D5B-48A0-8C04-d32DBFE128A8"; 
-    const BASKET_NAME = "global_nations_v4_design"; // New basket for fresh start
+    const BASKET_NAME = "global_nations_v6_jp_flag"; // データ構造が変わるため新規バスケット
     const API_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/${BASKET_NAME}`;
+
+    // ドット絵エディタ用
+    let editColor = "#3b82f6";
+    let flagPixels = new Array(40).fill("#ffffff"); // 8x5 = 40マス
+    const colors = ["#ef4444", "#3b82f6", "#10b981", "#f59e0b", "#ffffff", "#000000", "#6366f1", "#8b5cf6"];
 
     let gameData = {
       name: "Player",
-      color: "#3b82f6",
+      flag: new Array(40).fill("#ffffff"), // 国旗データ
       money: 1000,
       pop: 100,
       food: 200,
@@ -505,30 +548,87 @@
     let cloudData = { 
         nations: {}, 
         chat: [],
-        map: new Array(25).fill({owner: null, color: "#cbd5e1"}),
+        map: new Array(25).fill({owner: null, flag: null}),
         battles: [] 
     }; 
 
+    // --- 初期化 ---
     window.onload = function() {
-      if(localStorage.getItem("gn_save_v5")) {
-        const saved = JSON.parse(localStorage.getItem("gn_save_v5"));
+      initFlagEditor();
+      if(localStorage.getItem("gn_save_v6")) {
+        const saved = JSON.parse(localStorage.getItem("gn_save_v6"));
         gameData = {...gameData, ...saved};
         document.getElementById('inp-name').value = gameData.name;
-        document.getElementById('inp-color').value = gameData.color;
+        // ロードした国旗をエディタに反映
+        flagPixels = gameData.flag || new Array(40).fill("#ffffff");
+        renderEditorGrid();
       }
     };
 
+    // --- 国旗エディタ機能 ---
+    function initFlagEditor() {
+      // パレット生成
+      const p = document.getElementById('palette');
+      colors.forEach(c => {
+        const d = document.createElement('div');
+        d.className = 'color-btn';
+        d.style.backgroundColor = c;
+        d.onclick = () => {
+          editColor = c;
+          document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('selected'));
+          d.classList.add('selected');
+        };
+        p.appendChild(d);
+      });
+      renderEditorGrid();
+    }
+
+    function renderEditorGrid() {
+      const grid = document.getElementById('flag-editor');
+      grid.innerHTML = "";
+      flagPixels.forEach((col, i) => {
+        const pix = document.createElement('div');
+        pix.className = 'editor-pixel';
+        pix.style.backgroundColor = col;
+        pix.onclick = () => {
+          flagPixels[i] = editColor;
+          pix.style.backgroundColor = editColor;
+        };
+        grid.appendChild(pix);
+      });
+    }
+
+    // 小さい国旗を表示する関数
+    function renderMiniFlag(container, pixels) {
+        container.innerHTML = "";
+        if(!pixels || pixels.length === 0) pixels = new Array(40).fill("#eee");
+        
+        // CSS Gridで表示
+        container.style.display = 'grid';
+        container.style.gridTemplateColumns = 'repeat(8, 1fr)';
+        container.style.gridTemplateRows = 'repeat(5, 1fr)';
+        
+        pixels.forEach(c => {
+            const d = document.createElement('div');
+            d.style.backgroundColor = c;
+            d.style.width = "100%";
+            d.style.height = "100%";
+            container.appendChild(d);
+        });
+    }
+
+    // --- ゲーム開始 ---
     function startGame() {
       const name = document.getElementById('inp-name').value;
-      if(!name) return alert("Please enter a country name.");
+      if(!name) return alert("国名を入力してください。");
       
       gameData.name = name;
-      gameData.color = document.getElementById('inp-color').value;
+      gameData.flag = flagPixels; // エディタの内容を保存
       
       document.getElementById('modal-overlay').classList.add('hidden');
       document.getElementById('app').classList.remove('hidden');
       
-      addLog("Nation established successfully.");
+      addLog("建国されました。");
       updateUI();
       startGameLoop();
       
@@ -536,6 +636,7 @@
       syncTimer = setInterval(() => syncWithCloud(false), 5000);
     }
 
+    // --- クラウド同期 ---
     async function syncWithCloud(isFirstTime) {
       try {
         const res = await fetch(API_URL);
@@ -543,28 +644,29 @@
           const data = await res.json();
           if(!data.nations) data.nations = {};
           if(!data.chat) data.chat = [];
-          if(!data.map) data.map = new Array(25).fill({owner: null, color: "#cbd5e1"});
+          if(!data.map) data.map = new Array(25).fill({owner: null, flag: null});
           if(!data.battles) data.battles = [];
           cloudData = data;
         }
 
         processPendingBattles();
 
-        const myTerritories = cloudData.map.filter(tile => tile.owner === gameData.name).length;
+        const myTerritories = (cloudData.map || []).filter(tile => tile.owner === gameData.name).length;
         const myScore = gameData.money + (gameData.pop * 10) + (gameData.mil * 5) + (myTerritories * 1000);
         
         cloudData.nations[gameData.name] = {
           score: myScore,
-          color: gameData.color,
+          flag: gameData.flag,
           mil: gameData.mil + (gameData.defense * 20),
           updated: Date.now()
         };
 
         if(isFirstTime) {
-          cloudData.chat.push({name: "SYSTEM", text: `${gameData.name} has joined the world.`, time: getTimeStr(), color: "#94a3b8"});
+          cloudData.chat.push({name: "SYSTEM", text: `${gameData.name} が接続しました。`, time: getTimeStr(), color: "#94a3b8"});
         }
 
         if(cloudData.chat.length > 50) cloudData.chat = cloudData.chat.slice(-50);
+        
         await fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -575,10 +677,12 @@
         renderChat();
         renderMap();
 
-      } catch(e) { console.error(e); }
+      } catch(e) { console.error("Sync Error", e); }
     }
 
+    // --- 戦闘処理 ---
     function processPendingBattles() {
+        if(!cloudData.battles) return;
         const myBattles = cloudData.battles.filter(b => b.defender === gameData.name);
         if(myBattles.length === 0) return;
 
@@ -586,28 +690,30 @@
 
         myBattles.forEach(battle => {
             const tile = cloudData.map[battle.tileIndex];
-            if(tile.owner !== gameData.name) return;
+            if(tile.owner !== gameData.name) return; // 既に自分の土地でない
 
             const enemyPower = battle.attackerMil;
             const myPower = gameData.mil + (gameData.defense * 20);
             const winRate = enemyPower / (enemyPower + myPower);
 
             if(Math.random() < winRate) {
-                cloudData.map[battle.tileIndex] = { owner: battle.attacker, color: battle.attackerColor };
+                // 敗北
+                cloudData.map[battle.tileIndex] = { owner: battle.attacker, flag: battle.attackerFlag };
                 gameData.mil = Math.floor(gameData.mil * 0.7);
                 gameData.pop = Math.floor(gameData.pop * 0.9);
-                addLog(`[ALERT] ${battle.attacker} successfully raided your territory!`);
+                addLog(`[警告] ${battle.attacker} の奇襲により領土を失いました！`);
                 cloudData.chat.push({
-                    name: "WAR REPORT",
-                    text: `${battle.attacker} seized territory from ${gameData.name}!`,
+                    name: "戦争速報",
+                    text: `${battle.attacker} の奇襲成功！ ${gameData.name} の領土を奪取！`,
                     time: getTimeStr(),
                     color: "#ef4444"
                 });
             } else {
-                addLog(`[DEFENSE] We repelled an attack from ${battle.attacker}.`);
+                // 防衛成功
+                addLog(`[防衛] ${battle.attacker} の攻撃を撃退しました。`);
                 cloudData.chat.push({
-                    name: "WAR REPORT",
-                    text: `${gameData.name} defended against ${battle.attacker}.`,
+                    name: "戦争速報",
+                    text: `${gameData.name} が ${battle.attacker} の攻撃を撃退しました。`,
                     time: getTimeStr(),
                     color: "#3b82f6"
                 });
@@ -615,24 +721,43 @@
             battleHappened = true;
         });
 
+        // 処理済みバトルを削除
         cloudData.battles = cloudData.battles.filter(b => b.defender !== gameData.name);
+        
         if(battleHappened) { updateUI(); }
     }
 
+    // --- マップ描画 ---
     function renderMap() {
         const container = document.getElementById('world-map');
         container.innerHTML = "";
-        cloudData.map.forEach((tile, index) => {
+        (cloudData.map || []).forEach((tile, index) => {
             const div = document.createElement('div');
             div.className = 'map-tile';
-            div.style.backgroundColor = tile.color;
             
-            if(tile.owner === gameData.name) {
-                div.style.boxShadow = "inset 0 0 0 4px rgba(255,255,255,0.8)";
-                div.innerHTML = '<i class="fas fa-star" style="font-size:0.8rem; color:white;"></i>';
-            } else if(tile.owner) {
-                div.innerHTML = `<span style="font-size:0.8rem; color:rgba(255,255,255,0.7);">${tile.owner.substring(0, 1)}</span>`;
+            // 背景色 (デフォルト)
+            div.style.backgroundColor = "#cbd5e1";
+
+            if(tile.owner) {
+                // 領有されている場合、その国の国旗を表示
+                // 小さすぎるので簡易的に中央画素の色などを使う手もあるが、
+                // ここではCSS Gridで極小表示する
+                const miniFlag = document.createElement('div');
+                miniFlag.style.width = "100%";
+                miniFlag.style.height = "100%";
+                miniFlag.style.borderRadius = "4px";
+                miniFlag.style.overflow = "hidden";
+                renderMiniFlag(miniFlag, tile.flag);
+                
+                // 自分の領土なら枠線
+                if(tile.owner === gameData.name) {
+                    div.style.boxShadow = "0 0 0 3px #fbbf24";
+                    div.style.zIndex = "2";
+                }
+                
+                div.appendChild(miniFlag);
             }
+            
             div.onclick = () => handleMapClick(index, tile);
             container.appendChild(div);
         });
@@ -640,10 +765,10 @@
 
     function handleMapClick(index, tile) {
         if(!tile.owner) {
-            if(gameData.money < 300) return alert("Cost to claim: 300 Funds");
-            if(confirm("Claim this empty territory for 300 Funds?")) {
+            if(gameData.money < 300) return alert("領有費用: 300");
+            if(confirm("この空き地を領有しますか？ (費用: 300)")) {
                 gameData.money -= 300;
-                cloudData.map[index] = { owner: gameData.name, color: gameData.color };
+                cloudData.map[index] = { owner: gameData.name, flag: gameData.flag };
                 forceSaveCloud();
             }
             return;
@@ -654,38 +779,39 @@
         const targetData = cloudData.nations[targetName];
         if(!targetData) return;
 
+        // 60秒以内ならオンライン
         const isOnline = (Date.now() - targetData.updated) < 60000;
 
         if(isOnline) {
             const enemyPower = targetData.mil;
-            const confirmMsg = `[WAR DECLARATION]\nTarget: ${targetName} (ONLINE)\nEnemy Est. Power: ${enemyPower}\n\nAttack now?`;
+            const confirmMsg = `[宣戦布告]\n相手: ${targetName} (オンライン)\n敵戦力: ${enemyPower}\n\n攻撃しますか？`;
             
             if(confirm(confirmMsg)) {
                 const winRate = gameData.mil / (gameData.mil + enemyPower);
                 if(Math.random() < winRate) {
-                    cloudData.map[index] = { owner: gameData.name, color: gameData.color };
+                    cloudData.map[index] = { owner: gameData.name, flag: gameData.flag };
                     gameData.mil = Math.floor(gameData.mil * 0.9);
                     gameData.money += 500;
-                    addLog(`Victory! Seized territory from ${targetName}.`);
+                    addLog(`勝利！ ${targetName} の領土を奪いました。`);
                 } else {
                     gameData.mil = Math.floor(gameData.mil * 0.6);
-                    addLog("Defeat... Our forces were pushed back.");
+                    addLog("敗北... 撃退されました。");
                 }
                 forceSaveCloud();
             }
         } else {
-            const confirmMsg = `[AMBUSH PLAN]\nTarget: ${targetName} (OFFLINE)\n\nQueue an attack? Battle will resolve when they login.`;
+            const confirmMsg = `[奇襲計画]\n相手: ${targetName} (オフライン)\n\n攻撃部隊を派遣しますか？\n(相手がログインした瞬間に戦闘判定が行われます)`;
             
             if(confirm(confirmMsg)) {
                 cloudData.battles.push({
                     attacker: gameData.name,
-                    attackerColor: gameData.color,
+                    attackerFlag: gameData.flag,
                     attackerMil: gameData.mil,
                     defender: targetName,
                     tileIndex: index,
                     timestamp: Date.now()
                 });
-                addLog(`Troops deployed. Waiting for ${targetName} to return...`);
+                addLog(`攻撃部隊を派遣しました。${targetName} の帰還を待ちます...`);
                 forceSaveCloud();
             }
         }
@@ -708,18 +834,30 @@
         if(name === gameData.name) div.classList.add("rank-myself");
         
         const isOnline = (now - data.updated) < 60000;
-        const statusColor = isOnline ? "#10b981" : "#cbd5e1"; // Green or Grey
+        const statusColor = isOnline ? "#10b981" : "#cbd5e1"; 
         
+        // 小さい国旗作成
+        const flagContainer = document.createElement('div');
+        flagContainer.style.width = "24px";
+        flagContainer.style.height = "15px";
+        flagContainer.style.display = "inline-block";
+        flagContainer.style.marginRight = "8px";
+        flagContainer.style.border = "1px solid #ccc";
+        renderMiniFlag(flagContainer, data.flag);
+
         div.innerHTML = `
-          <span>
-            <span style="font-weight:bold; width:20px; display:inline-block; text-align:center;">${index+1}</span>
+          <div style="display:flex; align-items:center;">
+            <span style="font-weight:bold; width:20px; text-align:center; margin-right:5px;">${index+1}</span>
             <i class="fas fa-circle status-dot" style="color:${statusColor}"></i>
-            <span style="display:inline-block; width:12px; height:12px; background:${data.color}; border-radius:3px; margin-right:5px;"></span>
-            ${name}
-          </span>
+          </div>
+          <div style="flex:1; display:flex; align-items:center;">
+             <!-- ここに国旗を入れる -->
+             ${flagContainer.outerHTML}
+             <span>${name}</span>
+          </div>
           <span style="font-weight:bold;">${data.score.toLocaleString()}</span>
         `;
-        div.title = isOnline ? "Online" : "Offline (Attackable)";
+        div.title = isOnline ? "オンライン" : "オフライン (攻撃可)";
         list.appendChild(div);
       });
     }
@@ -740,7 +878,7 @@
       const inp = document.getElementById('chat-input');
       const text = inp.value;
       if(!text) return;
-      cloudData.chat.push({ name: gameData.name, text: text, time: getTimeStr(), color: gameData.color });
+      cloudData.chat.push({ name: gameData.name, text: text, time: getTimeStr(), color: "#333" });
       await forceSaveCloud();
       inp.value = "";
     }
@@ -753,46 +891,49 @@
         if(gameData.food < 0) { gameData.food = 0; gameData.pop -= 5; gameData.app -= 5; }
         if(gameData.tax > 30) gameData.app--; else if(gameData.tax < 15) gameData.app++;
         if(gameData.app > 100) gameData.app = 100;
-        if(gameData.app <= 0) { gameData.money = Math.floor(gameData.money/2); gameData.app=50; addLog("Riots! Funds halved."); }
+        if(gameData.app <= 0) { gameData.money = Math.floor(gameData.money/2); gameData.app=50; addLog("暴動発生！資金が半減しました。"); }
         
         updateUI();
-        localStorage.setItem("gn_save_v5", JSON.stringify(gameData));
+        localStorage.setItem("gn_save_v6", JSON.stringify(gameData));
       }, 3000);
     }
 
+    // アクション関数
     function actionInvest() {
-      if(gameData.money < 500 || gameData.mat < 10) return alert("Need: 500 Funds, 10 Mat");
+      if(gameData.money < 500 || gameData.mat < 10) return alert("資金500、資材10が必要です。");
       gameData.money -= 500; gameData.mat -= 10; gameData.pop += 50; updateUI();
     }
     function actionPropaganda() {
-      if(gameData.money < 200) return alert("Need: 200 Funds");
+      if(gameData.money < 200) return alert("資金200が必要です。");
       gameData.money -= 200; gameData.app += 5; updateUI();
     }
     function buyResource(t, c, a) {
-      if(gameData.money < c) return alert("Insufficient Funds");
+      if(gameData.money < c) return alert("資金不足です。");
       gameData.money -= c; gameData[t] += a; updateUI();
     }
     function takeLoan() { gameData.money += 1000; gameData.debt += 1100; updateUI(); }
     function repayLoan() {
-      if(gameData.money < 1100 || gameData.debt <= 0) return alert("Cannot repay");
+      if(gameData.money < 1100 || gameData.debt <= 0) return alert("返済できません。");
       gameData.money -= 1100; gameData.debt -= 1100; if(gameData.debt<0)gameData.debt=0; updateUI();
     }
     function recruit() {
-      if(gameData.money < 200 || gameData.pop < 10) return alert("Need: 200 Funds, 10 Pop");
+      if(gameData.money < 200 || gameData.pop < 10) return alert("資金200、人口10が必要です。");
       gameData.money -= 200; gameData.pop -= 10; gameData.mil += 20; updateUI();
     }
     function train() {
-      if(gameData.money < 300 || gameData.oil < 10) return alert("Need: 300 Funds, 10 Oil");
+      if(gameData.money < 300 || gameData.oil < 10) return alert("資金300、石油10が必要です。");
       gameData.money -= 300; gameData.oil -= 10; gameData.mil += 50; updateUI();
     }
     function buildDefense() {
-      if(gameData.money < 1000 || gameData.mat < 100) return alert("Need: 1000 Funds, 100 Mat");
+      if(gameData.money < 1000 || gameData.mat < 100) return alert("資金1000、資材100が必要です。");
       gameData.money -= 1000; gameData.mat -= 100; gameData.defense++; updateUI();
     }
 
     function updateUI() {
       document.getElementById('disp-name').innerText = gameData.name;
-      document.getElementById('disp-flag').style.backgroundColor = gameData.color;
+      // サイドバーの国旗更新
+      renderMiniFlag(document.getElementById('disp-flag'), gameData.flag);
+      
       document.getElementById('game-date').innerText = "Day " + gameData.day;
       
       document.getElementById('val-money').innerText = gameData.money;
@@ -804,7 +945,7 @@
       document.getElementById('val-app').innerText = gameData.app + "%";
       document.getElementById('val-debt').innerText = gameData.debt;
 
-      const myTerritories = cloudData.map ? cloudData.map.filter(t => t.owner === gameData.name).length : 0;
+      const myTerritories = (cloudData.map || []).filter(t => t.owner === gameData.name).length;
       const score = gameData.money + (gameData.pop * 10) + (gameData.mil * 5) + (myTerritories * 1000);
       document.getElementById('my-total-score').innerText = score.toLocaleString();
       
@@ -816,7 +957,7 @@
     function addLog(msg) {
       const list = document.getElementById('log-list');
       const div = document.createElement('div');
-      div.innerText = `[D${gameData.day}] ${msg}`;
+      div.innerText = `[Day ${gameData.day}] ${msg}`;
       list.prepend(div);
       document.getElementById('news-text').innerText = msg;
     }
