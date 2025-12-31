@@ -1,35 +1,35 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>世界地図（GeoJSON）</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <style>
-    #map { height: 100vh; }
-  </style>
+<meta charset="UTF-8">
+<title>インタラクティブ世界地図</title>
+<style>
+  body { margin: 0; }
+  svg { width: 100vw; height: 100vh; }
+  path { fill: #cce5ff; stroke: #333; stroke-width: 0.5; cursor: pointer; transition: fill 0.2s; }
+  path:hover { fill: #6699ff; }
+</style>
 </head>
 <body>
 
-<div id="map"></div>
+<!-- SVG 世界地図を埋め込む -->
+<svg viewBox="-180 -90 360 180">
+  <!-- 簡易的な大陸のパス例 -->
+  <path d="M-100,-20 L-80,-20 L-80,0 L-100,0 Z" title="北アメリカ"></path>
+  <path d="M-20,-10 L0,-10 L0,10 L-20,10 Z" title="南アメリカ"></path>
+  <path d="M40,-30 L80,-30 L80,10 L40,10 Z" title="アフリカ"></path>
+  <path d="M100,-10 L140,-10 L140,30 L100,30 Z" title="アジア"></path>
+  <path d="M140,-40 L180,-40 L180,-10 L140,-10 Z" title="オーストラリア"></path>
+  <path d="M-40,20 L20,20 L20,50 L-40,50 Z" title="ヨーロッパ"></path>
+</svg>
 
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
-  // 地図を作る
-  const map = L.map('map').setView([20, 0], 2);
-
-  // ベース地図（OpenStreetMap）
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors'
-  }).addTo(map);
-
-  // GeoJSON を読み込む
-  fetch('countries.geojson')
-    .then(res => res.json())
-    .then(data => {
-      L.geoJSON(data, {
-        style: { color: '#555', weight: 1 },
-      }).addTo(map);
+  // 各大陸をクリックしたときに名前を表示
+  document.querySelectorAll('path').forEach(path => {
+    path.addEventListener('click', () => {
+      alert('選択された地域: ' + path.getAttribute('title'));
     });
+  });
 </script>
 
 </body>
