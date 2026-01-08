@@ -275,31 +275,67 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
       });
     });
   }
+
+  // --- 領土描画・購入 (合成ロジック搭載) ---
   function startExpansion() {
     expansionMode = true; document.getElementById('mapMsg').style.display = 'block';
     if(drawControl) map.removeControl(drawControl);
-    drawControl = new L.Control.Draw({ draw: { polygon: { allowIntersection: false }, rectangle:true, circle:false, marker:false, polyline:false, circlemarker:false }, edit: false });
+    drawControl = new L.Control.Draw({ 
+      draw: { polygon: { allowIntersection: false }, rectangle:true, circle:false, marker:false, polyline:false, circlemarker:false }, 
+      edit: false 
+    });
     map.addControl(drawControl);
     map.off(L.Draw.Event.CREATED);
     map.on(L.Draw.Event.CREATED, async e => {
       if(!expansionMode) return;
-      const newLayer = e.layer; const newGeo = newLayer.toGeoJSON();
+      const newLayer = e.layer; 
+      const newGeo = newLayer.toGeoJSON();
       const latlngs = newLayer.getLatLngs()[0];
-      const area = Math.round(L.GeometryUtil.geodesicArea(latlngs)/1000000);
       const db = await getDB();
-      let isOverlap = false;
+      
+      // 1. 他国の領土と重なっているかチェック
+      let isOverlapOther = false;
       Object.keys(db.nations || {}).forEach(k => {
         if(k === myName) return;
-        (db.nations[k].geometries || []).forEach(geo => { try { if(turf.intersect(newGeo, geo)) isOverlap = true; } catch(err){} });
+        (db.nations[k].geometries || []).forEach(geo => { 
+          try { if(turf.intersect(newGeo, geo)) isOverlapOther = true; } catch(err){} 
+        });
       });
-      if(isOverlap) { alert("⚠️ 他国と重なっています！"); map.removeLayer(newLayer); return; }
-      const cost = (myData.area === 0) ? 0 : area * 100;
+      if(isOverlapOther) { alert("⚠️ 他国の領土と重なっています！別の場所に描いてください。"); map.removeLayer(newLayer); return; }
+
+      // 2. 面積計算 (合成前の純粋な新規面積)
+      const newArea = Math.round(L.GeometryUtil.geodesicArea(latlngs)/1000000);
+      const cost = (myData.area === 0) ? 0 : newArea * 100;
+
       if(myData.money >= cost) {
-        if(confirm(`面積: ${area.toLocaleString()} km²\n購入しますか？`)) {
-          myData.money -= cost; myData.area += area; myData.geometries.push(newGeo);
-          db.nations[myName] = myData; await saveDB(db); location.reload();
+        if(confirm(`面積: ${newArea.toLocaleString()} km²\n費用: $${cost.toLocaleString()}\n購入しますか？`)) {
+          
+          // 3. 自分の領土との合成 (ユニオン)
+          let finalGeo = newGeo;
+          if(myData.geometries.length > 0) {
+            // 既存の全領土と結合を試みる
+            myData.geometries.forEach(existingGeo => {
+              try {
+                // turf.unionで二つのポリゴンを一つに。重なっていれば境界が消える。
+                finalGeo = turf.union(finalGeo, existingGeo);
+              } catch(err) { console.error("Union error", err); }
+            });
+          }
+
+          // データ更新
+          myData.money -= cost;
+          myData.geometries = [finalGeo]; // 常に統合された1つのマルチポリゴンとして保存
+          
+          // 全体の面積を再計算（正確なkm2）
+          myData.area = Math.round(turf.area(finalGeo) / 1000000);
+          
+          db.nations[myName] = myData;
+          await saveDB(db);
+          alert("領土を購入・統合しました！");
+          location.reload();
         } else map.removeLayer(newLayer);
-      } else { alert("資金不足"); map.removeLayer(newLayer); }
+      } else { alert("資金不足です"); map.removeLayer(newLayer); }
+      
       expansionMode = false; document.getElementById('mapMsg').style.display = 'none'; map.removeControl(drawControl);
     });
   }
@@ -327,20 +363,15 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
     document.getElementById('valArea').innerText = myData.area.toLocaleString();
     document.getElementById('valGDP').innerText = Math.floor(myData.gdp).toLocaleString();
     document.getElementById('valMil').innerText = myData.military.toLocaleString();
-    
-    // 申請リストの更新
     const reqBox = document.getElementById('requestBox');
     if(myData.requests && myData.requests.length > 0) {
       reqBox.innerHTML = "";
       myData.requests.forEach(sender => {
-        const div = document.createElement('div');
-        div.style.marginBottom = "5px";
+        const div = document.createElement('div'); div.style.marginBottom = "5px";
         div.innerHTML = `🤝 ${sender} <br> <button class="admin-edit-btn" onclick="acceptRequest('${sender}')">承諾</button> <button class="admin-edit-btn" style="color:red;" onclick="rejectRequest('${sender}')">却下</button>`;
         reqBox.appendChild(div);
       });
-    } else {
-      reqBox.innerHTML = '<span style="color:#666;">申請はありません</span>';
-    }
+    } else { reqBox.innerHTML = '<span style="color:#666;">申請はありません</span>'; }
   }
   function ecoTick() { const tax = parseInt(document.getElementById('taxRate').value) / 100; myData.money += myData.gdp * tax; refreshUI(); }
   function invest() { if(myData.money>=2000){myData.money-=2000; myData.gdp+=500; refreshUI();}else alert("資金不足"); }
@@ -355,61 +386,39 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
     document.getElementById('targetStatus').style.color = isAlly ? "#00ff99" : "#ccc";
   }
 
-  // --- 同盟申請システム ---
   async function actionAlly() {
-    if(!selectedTarget || myData.allies.includes(selectedTarget)) return alert("すでに同盟中か、国が選択されていません");
-    const db = await getDB();
-    const targetNation = db.nations[selectedTarget];
-    if(!targetNation) return;
+    if(!selectedTarget || myData.allies.includes(selectedTarget)) return alert("不可");
+    const db = await getDB(); const targetNation = db.nations[selectedTarget]; if(!targetNation) return;
     if(!targetNation.requests) targetNation.requests = [];
-    if(targetNation.requests.includes(myName)) return alert("すでに申請済みです");
-    
-    targetNation.requests.push(myName);
-    await saveDB(db);
-    alert(`${selectedTarget} へ同盟申請を送りました。相手の承諾を待ってください。`);
+    if(targetNation.requests.includes(myName)) return alert("申請済み");
+    targetNation.requests.push(myName); await saveDB(db); alert(`${selectedTarget} へ申請完了`);
   }
-
   async function acceptRequest(sender) {
-    const db = await getDB();
-    // 自分のリストから申請を消して同盟へ
-    myData.requests = myData.requests.filter(r => r !== sender);
-    myData.allies.push(sender);
-    // 相手の同盟リストにも自分を追加
-    if(db.nations[sender]) {
-      if(!db.nations[sender].allies) db.nations[sender].allies = [];
-      db.nations[sender].allies.push(myName);
-    }
-    db.nations[myName] = myData;
-    await saveDB(db);
-    alert(`${sender} と同盟を結びました！`);
-    location.reload();
+    const db = await getDB(); myData.requests = myData.requests.filter(r => r !== sender); myData.allies.push(sender);
+    if(db.nations[sender]) { if(!db.nations[sender].allies) db.nations[sender].allies = []; db.nations[sender].allies.push(myName); }
+    db.nations[myName] = myData; await saveDB(db); location.reload();
   }
-
   async function rejectRequest(sender) {
-    const db = await getDB();
-    myData.requests = myData.requests.filter(r => r !== sender);
-    db.nations[myName] = myData;
-    await saveDB(db);
-    alert("申請を却下しました");
-    refreshUI();
+    const db = await getDB(); myData.requests = myData.requests.filter(r => r !== sender);
+    db.nations[myName] = myData; await saveDB(db); refreshUI();
   }
-
   async function actionWar() {
-    if(!selectedTarget || myData.allies.includes(selectedTarget)) return alert("同盟国には攻撃できません");
+    if(!selectedTarget || myData.allies.includes(selectedTarget)) return alert("不可");
     const db = await getDB(); const en = db.nations[selectedTarget]; if(!en) return;
-    if(!confirm(`${selectedTarget} に宣戦布告しますか？`)) return;
+    if(!confirm(`${selectedTarget} に宣戦布告？`)) return;
     const myPow = myData.military*(0.8+Math.random()*0.4); const enPow = en.military*(0.8+Math.random()*0.4);
     if(myPow > enPow) {
       const loot = Math.floor(en.money*0.5); en.money -= loot; myData.money += loot;
       if(confirm(`勝利！ $${loot.toLocaleString()}を略奪。併合しますか？`)) {
-        myData.geometries = myData.geometries.concat(en.geometries||[]); myData.area += en.area; myData.gdp += Math.floor(en.gdp*0.5);
-        delete db.nations[selectedTarget]; alert("併合完了！");
+        myData.geometries = [turf.union(myData.geometries[0], en.geometries[0])];
+        myData.area += en.area; myData.gdp += Math.floor(en.gdp*0.5);
+        delete db.nations[selectedTarget]; alert("併合！");
       }
       db.nations[myName]=myData; if(db.nations[selectedTarget]) db.nations[selectedTarget]=en;
       await saveDB(db); location.reload();
     } else {
       const loss = Math.floor(myData.money*0.3); myData.money -= loss; myData.military = Math.floor(myData.military*0.7);
-      alert(`敗北... $${loss.toLocaleString()} を支払いました`); db.nations[myName]=myData; await saveDB(db); refreshUI();
+      alert(`敗北...`); db.nations[myName]=myData; await saveDB(db); refreshUI();
     }
   }
 
@@ -420,7 +429,7 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
       document.getElementById('overlayAdminAuth').classList.add('hidden');
       document.getElementById('adminPanel').classList.remove('hidden');
       refreshAdminList();
-    } else { alert("管理者パスワードが違います"); }
+    } else { alert("パスワード不一致"); }
   }
   function closeAdmin() { document.getElementById('adminPanel').classList.add('hidden'); }
   function adminLogout() { localStorage.removeItem('adminSession'); location.reload(); }
@@ -444,12 +453,11 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
     });
   }
   async function adminEdit(country, key, currentVal) {
-    let newVal = prompt(`${country} の ${key} を変更しますか？`, currentVal);
-    if(newVal === null || newVal === "") return;
+    let newVal = prompt(`${country} の ${key} を変更？`, currentVal); if(newVal === null || newVal === "") return;
     const db = await getDB();
     if(key === 'pass') db.nations[country][key] = newVal;
     else db.nations[country][key] = Number(newVal);
-    await saveDB(db); alert("更新しました"); refreshAdminList();
+    await saveDB(db); refreshAdminList();
   }
-  async function del(name) { if(confirm("【警告】国「" + name + "」を完全に削除しますか？")) { const db=await getDB(); delete db.nations[name]; await saveDB(db); refreshAdminList(); } }
+  async function del(name) { if(confirm("削除？")) { const db=await getDB(); delete db.nations[name]; await saveDB(db); refreshAdminList(); } }
 </script></body> </html>
