@@ -137,18 +137,21 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
       <h3>軍備</h3>
       <button class="btn-war" onclick="recruit()">⚔️ 兵士雇用 (-$1000)</button>
        
-      <h3>外交申請</h3>
+      <h3>外交・戦争</h3>
       <div id="requestBox" style="background:#1a1a1a; padding:10px; border-radius:4px; max-height:100px; overflow-y:auto; margin-bottom:10px; font-size:0.85em;">
          <span style="color:#666;">申請はありません</span>
       </div>
 
-      <h3>外交ターゲット</h3>
-      <div class="stat-card" style="text-align:left; margin-bottom:10px;">
+      <div class="stat-card" style="text-align:left; margin-bottom:10px; border-color:var(--neon-red);">
         ターゲット: <b id="targetName" style="color:var(--neon-blue)">なし</b><br>
-        状態: <span id="targetStatus">---</span>
+        状態: <span id="targetStatus">---</span><br>
+        <div id="warProgressBox" class="hidden">
+           占領進行度: <span id="warProgressVal">0</span>%
+        </div>
       </div>
       <button class="btn-buy" id="btnAlly" onclick="actionAlly()" disabled>🤝 同盟申請を送る</button>
       <button class="btn-war" id="btnWar" onclick="actionWar()" disabled>💣 宣戦布告</button>
+      <button class="btn-war" id="btnAttack" onclick="actionAttack()" style="background:orange; display:none;">🔥 攻撃開始！</button>
     </div>
 <!-- Flag Tab -->
     <div id="tab-flag" class="hidden">
@@ -173,26 +176,18 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
   let selectedTarget = null;
   let expansionMode = false;
 
-  // --- Startup Check ---
   window.onload = function() {
     const savedName = localStorage.getItem('autoName');
     const savedPass = localStorage.getItem('autoPass');
-    if(savedName && savedPass) {
-      document.getElementById('loadingMsg').style.display = 'block';
-      login(savedName, savedPass);
-    }
+    if(savedName && savedPass) { document.getElementById('loadingMsg').style.display = 'block'; login(savedName, savedPass); }
   };
 
-  // --- Key Events ---
   document.addEventListener('keydown', (e) => {
     if(e.shiftKey && e.altKey) {
       if(localStorage.getItem('adminSession') === 'active') {
         document.getElementById('overlayAdminAuth').classList.add('hidden');
-        document.getElementById('adminPanel').classList.remove('hidden');
-        refreshAdminList();
-      } else {
-        document.getElementById('overlayAdminAuth').classList.remove('hidden');
-      }
+        document.getElementById('adminPanel').classList.remove('hidden'); refreshAdminList();
+      } else { document.getElementById('overlayAdminAuth').classList.remove('hidden'); }
     }
   });
 
@@ -218,29 +213,22 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
   async function register() {
     const name = document.getElementById('regName').value;
     const pass = document.getElementById('regPass').value;
-    if(!name || !pass) return alert("入力が不足しています");
+    if(!name || !pass) return alert("入力不足");
     const db = await getDB();
-    if(db.nations && db.nations[name]) return alert("その国名は既に存在します");
-    db.nations[name] = { pass: pass, money: 20000000, gdp: 5000, military: 500, area: 0, geometries: [], allies: [], requests: [], flag: null };
-    await saveDB(db); alert("建国完了。ログインしてください。"); showScreen('Login');
+    if(db.nations && db.nations[name]) return alert("国名重複");
+    db.nations[name] = { pass: pass, money: 20000000, gdp: 5000, military: 500, area: 0, geometries: [], allies: [], requests: [], warTarget: null, flag: null };
+    await saveDB(db); alert("建国完了"); showScreen('Login');
   }
   async function login(autoName, autoPass) {
     const name = autoName || document.getElementById('loginName').value;
     const pass = autoPass || document.getElementById('loginPass').value;
-    const msg = document.getElementById('loginMsg');
-    if(!autoName && msg) msg.innerText = "通信中...";
     const db = await getDB();
     const n = db.nations ? db.nations[name] : null;
-    if(!n) { if(msg) msg.innerText="国が存在しません"; return; }
-    if(n.pass !== pass) { if(msg) msg.innerText="パスワード不一致"; return; }
+    if(!n || n.pass !== pass) return;
     localStorage.setItem('autoName', name); localStorage.setItem('autoPass', pass);
     myName = name; myData = n;
-    if(!myData.geometries) myData.geometries = [];
-    if(!myData.allies) myData.allies = [];
-    if(!myData.requests) myData.requests = [];
     startGame(db);
   }
-  function doLogout() { if(confirm("ログアウトしますか？")) { localStorage.removeItem('autoName'); localStorage.removeItem('autoPass'); location.reload(); } }
   function startGame(db) {
     document.getElementById('overlayStart').classList.add('hidden');
     document.getElementById('gameUI').classList.remove('hidden');
@@ -265,82 +253,170 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
     Object.keys(nations).forEach(key => {
       const n = nations[key];
       const isMe = (key === myName);
-      const isAlly = myData.allies.includes(key);
-      let color = isMe ? "#00f3ff" : (isAlly ? "#00ff99" : "#ff0055");
+      const isAlly = (myData.allies || []).includes(key);
+      const isWar = (myData.warTarget === key);
+      let color = isMe ? "#00f3ff" : (isWar ? "#ff8800" : (isAlly ? "#00ff99" : "#ff0055"));
       const flagImg = n.flag ? `<img src="${n.flag}" class="pop-flag">` : "";
       (n.geometries || []).forEach(geo => {
         L.geoJSON(geo, { style: { color: color, weight: 2, fillOpacity: 0.3 } })
-        .bindPopup(`<div style="text-align:center;">${flagImg}<b>${key}</b><br>軍事: ${n.military}<br>GDP: $${n.gdp.toLocaleString()}</div>`)
+        .bindPopup(`<div style="text-align:center;">${flagImg}<b>${key}</b><br>軍事: ${n.military}<br>面積: ${n.area}</div>`)
         .addTo(drawnItems);
       });
     });
   }
 
-  // --- 領土描画・購入 (合成ロジック搭載) ---
   function startExpansion() {
     expansionMode = true; document.getElementById('mapMsg').style.display = 'block';
     if(drawControl) map.removeControl(drawControl);
-    drawControl = new L.Control.Draw({ 
-      draw: { polygon: { allowIntersection: false }, rectangle:true, circle:false, marker:false, polyline:false, circlemarker:false }, 
-      edit: false 
-    });
+    drawControl = new L.Control.Draw({ draw: { polygon: { allowIntersection: false }, rectangle:true }, edit: false });
     map.addControl(drawControl);
     map.off(L.Draw.Event.CREATED);
     map.on(L.Draw.Event.CREATED, async e => {
       if(!expansionMode) return;
-      const newLayer = e.layer; 
-      const newGeo = newLayer.toGeoJSON();
-      const latlngs = newLayer.getLatLngs()[0];
+      const newGeo = e.layer.toGeoJSON();
       const db = await getDB();
-      
-      // 1. 他国の領土と重なっているかチェック
       let isOverlapOther = false;
-      Object.keys(db.nations || {}).forEach(k => {
-        if(k === myName) return;
-        (db.nations[k].geometries || []).forEach(geo => { 
-          try { if(turf.intersect(newGeo, geo)) isOverlapOther = true; } catch(err){} 
-        });
-      });
-      if(isOverlapOther) { alert("⚠️ 他国の領土と重なっています！別の場所に描いてください。"); map.removeLayer(newLayer); return; }
-
-      // 2. 面積計算 (合成前の純粋な新規面積)
-      const newArea = Math.round(L.GeometryUtil.geodesicArea(latlngs)/1000000);
+      Object.keys(db.nations || {}).forEach(k => { if(k !== myName) (db.nations[k].geometries || []).forEach(geo => { try { if(turf.intersect(newGeo, geo)) isOverlapOther = true; } catch(err){} }); });
+      if(isOverlapOther) { alert("他国と重なっています"); map.removeLayer(e.layer); return; }
+      const newArea = Math.round(L.GeometryUtil.geodesicArea(e.layer.getLatLngs()[0])/1000000);
       const cost = (myData.area === 0) ? 0 : newArea * 100;
-
       if(myData.money >= cost) {
-        if(confirm(`面積: ${newArea.toLocaleString()} km²\n費用: $${cost.toLocaleString()}\n購入しますか？`)) {
-          
-          // 3. 自分の領土との合成 (ユニオン)
+        if(confirm(`購入しますか？`)) {
           let finalGeo = newGeo;
-          if(myData.geometries.length > 0) {
-            // 既存の全領土と結合を試みる
-            myData.geometries.forEach(existingGeo => {
-              try {
-                // turf.unionで二つのポリゴンを一つに。重なっていれば境界が消える。
-                finalGeo = turf.union(finalGeo, existingGeo);
-              } catch(err) { console.error("Union error", err); }
-            });
-          }
-
-          // データ更新
-          myData.money -= cost;
-          myData.geometries = [finalGeo]; // 常に統合された1つのマルチポリゴンとして保存
-          
-          // 全体の面積を再計算（正確なkm2）
-          myData.area = Math.round(turf.area(finalGeo) / 1000000);
-          
-          db.nations[myName] = myData;
-          await saveDB(db);
-          alert("領土を購入・統合しました！");
-          location.reload();
-        } else map.removeLayer(newLayer);
-      } else { alert("資金不足です"); map.removeLayer(newLayer); }
-      
-      expansionMode = false; document.getElementById('mapMsg').style.display = 'none'; map.removeControl(drawControl);
+          (myData.geometries || []).forEach(eg => { try { finalGeo = turf.union(finalGeo, eg); } catch(err){} });
+          myData.money -= cost; myData.geometries = [finalGeo]; myData.area = Math.round(turf.area(finalGeo)/1000000);
+          db.nations[myName] = myData; await saveDB(db); location.reload();
+        }
+      }
     });
   }
 
-  let ctx, isDrawing=false; const PX=10;
+  function refreshUI() {
+    document.getElementById('uiName').innerText = myName;
+    document.getElementById('valMoney').innerText = Math.floor(myData.money).toLocaleString();
+    document.getElementById('valArea').innerText = myData.area.toLocaleString();
+    document.getElementById('valGDP').innerText = Math.floor(myData.gdp).toLocaleString();
+    document.getElementById('valMil').innerText = myData.military.toLocaleString();
+    
+    if(myData.warTarget) {
+      document.getElementById('btnAttack').style.display = 'block';
+      document.getElementById('btnWar').style.display = 'none';
+      document.getElementById('targetStatus').innerText = "戦争中！";
+      document.getElementById('targetStatus').style.color = "orange";
+    } else {
+      document.getElementById('btnAttack').style.display = 'none';
+      document.getElementById('btnWar').style.display = 'block';
+    }
+
+    const reqBox = document.getElementById('requestBox');
+    reqBox.innerHTML = (myData.requests && myData.requests.length > 0) ? "" : '<span style="color:#666;">申請なし</span>';
+    (myData.requests || []).forEach(s => {
+      const d = document.createElement('div'); d.innerHTML = `${s} <button onclick="acceptRequest('${s}')">承</button> <button onclick="rejectRequest('${s}')">拒</button>`;
+      reqBox.appendChild(d);
+    });
+  }
+
+  function ecoTick() { const tax = parseInt(document.getElementById('taxRate').value) / 100; myData.money += myData.gdp * tax; refreshUI(); }
+  function invest() { if(myData.money>=2000){myData.money-=2000; myData.gdp+=500; refreshUI();} }
+  function recruit() { if(myData.money>=1000){myData.money-=1000; myData.military+=200; refreshUI();} }
+  async function manualSave() { const db=await getDB(); db.nations[myName]=myData; await saveDB(db); alert("保存完了"); }
+
+  function selectTarget(name) {
+    selectedTarget = name; document.getElementById('targetName').innerText = name;
+    document.getElementById('btnAlly').disabled = false; document.getElementById('btnWar').disabled = false;
+    const isAlly = (myData.allies || []).includes(name);
+    document.getElementById('targetStatus').innerText = isAlly ? "同盟中" : (myData.warTarget === name ? "戦争中" : "中立");
+  }
+
+  async function actionAlly() {
+    const db = await getDB(); const t = db.nations[selectedTarget]; if(!t) return;
+    if(!t.requests) t.requests = []; t.requests.push(myName); await saveDB(db); alert("申請完了");
+  }
+
+  async function actionWar() {
+    if(!selectedTarget || confirm(`${selectedTarget} に宣戦布告しますか？`)) {
+      myData.warTarget = selectedTarget;
+      const db = await getDB(); db.nations[myName] = myData; await saveDB(db); 
+      alert("戦争が始まりました！『攻撃開始』で領土を奪ってください。");
+      location.reload();
+    }
+  }
+
+  // --- 段階的戦争システム ---
+  async function actionAttack() {
+    const db = await getDB(); const target = myData.warTarget;
+    const en = db.nations[target];
+    if(!en) { alert("相手国が消滅しました"); myData.warTarget = null; await saveDB(db); location.reload(); return; }
+
+    // 戦闘計算
+    const myPow = myData.military * (0.7 + Math.random() * 0.6);
+    const enPow = en.military * (0.7 + Math.random() * 0.6);
+
+    if(myPow > enPow) {
+      // 勝利：相手の15%を奪う
+      const stealArea = Math.floor(en.area * 0.15);
+      const stealGDP = Math.floor(en.gdp * 0.15);
+      
+      en.area -= stealArea; en.gdp -= stealGDP;
+      myData.area += stealArea; myData.gdp += stealGDP;
+      
+      // 軍へのダメージ
+      myData.military = Math.max(0, myData.military - Math.floor(en.military * 0.2));
+      en.military = Math.max(0, en.military - Math.floor(myData.military * 0.4));
+
+      alert(`小規模戦勝利！\n面積 ${stealArea}km² 奪取！\n(自軍損害: -${Math.floor(en.military * 0.2)})`);
+
+      // 相手が壊滅した場合
+      if(en.area < 500 || en.military <= 0) {
+        if(confirm("相手国が壊滅しました。全領土を併合しますか？")) {
+          myData.area += en.area; myData.gdp += en.gdp;
+          // 領土合成
+          try { myData.geometries = [turf.union(myData.geometries[0], en.geometries[0])]; } catch(e){}
+          delete db.nations[target];
+          myData.warTarget = null;
+          alert("完全併合に成功しました！");
+        }
+      }
+    } else {
+      // 敗北：損害のみ
+      const loss = Math.floor(myData.military * 0.3);
+      myData.military -= loss;
+      alert(`攻撃失敗... 返り討ちに遭い ${loss} 人の兵士を失いました。`);
+    }
+
+    db.nations[myName] = myData;
+    if(db.nations[target]) db.nations[target] = en;
+    await saveDB(db); refreshUI(); renderWorld(db.nations);
+  }
+
+  async function acceptRequest(s) {
+    const db = await getDB(); myData.requests = myData.requests.filter(r => r !== s);
+    if(!myData.allies) myData.allies = []; myData.allies.push(s);
+    if(db.nations[s]) { if(!db.nations[s].allies) db.nations[s].allies = []; db.nations[s].allies.push(myName); }
+    db.nations[myName] = myData; await saveDB(db); location.reload();
+  }
+
+  function attemptAdminLogin() {
+    if(document.getElementById('adminKey').value === "201305042020302") {
+      localStorage.setItem('adminSession', 'active');
+      document.getElementById('overlayAdminAuth').classList.add('hidden');
+      document.getElementById('adminPanel').classList.remove('hidden'); refreshAdminList();
+    }
+  }
+  function closeAdmin() { document.getElementById('adminPanel').classList.add('hidden'); }
+  async function refreshAdminList() {
+    const t = document.getElementById('adminTableBody'); t.innerHTML = "";
+    const db = await getDB();
+    Object.keys(db.nations||{}).forEach(k => {
+      const n = db.nations[k]; const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${k}</td><td>${n.pass} <button onclick="adminEdit('${k}','pass','${n.pass}')">変</button></td>
+      <td>${n.money} <button onclick="adminEdit('${k}','money',${n.money})">変</button></td><td>${n.area}</td><td>${n.gdp}</td><td>${n.military}</td>
+      <td><button onclick="del('${k}')">消</button></td>`;
+      t.appendChild(tr);
+    });
+  }
+  async function adminEdit(c,k,v){ let n=prompt("変更後",v); if(n!==null){ const db=await getDB(); db.nations[c][k]=(k==='pass'?n:Number(n)); await saveDB(db); refreshAdminList(); }}
+  async function del(n){ if(confirm("削除？")){ const db=await getDB(); delete db.nations[n]; await saveDB(db); refreshAdminList(); }}
   function initFlagEditor() {
     const c = document.getElementById('flagCanvas'); ctx = c.getContext('2d');
     if(myData.flag) { const i=new Image(); i.onload=()=>ctx.drawImage(i,0,0); i.src=myData.flag; } else { ctx.fillStyle="#fff"; ctx.fillRect(0,0,100,60); }
@@ -353,111 +429,6 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
     c.onmousemove=e=>{if(isDrawing) draw(e,curCol);};
     c.onmouseup=()=>{isDrawing=false;};
   }
-  function draw(e,c){const r=e.target.getBoundingClientRect(); ctx.fillStyle=c; ctx.fillRect(Math.floor((e.clientX-r.left)/PX)*PX, Math.floor((e.clientY-r.top)/PX)*PX, PX, PX);}
-  function clearFlag(){ctx.fillStyle="#fff"; ctx.fillRect(0,0,100,60);}
+  function draw(e,c){const r=e.target.getBoundingClientRect(); ctx.fillStyle=c; ctx.fillRect(Math.floor((e.clientX-r.left)/10)*10, Math.floor((e.clientY-r.top)/10)*10, 10, 10);}
   async function saveFlag(){myData.flag=document.getElementById('flagCanvas').toDataURL(); await manualSave();}
-
-  function refreshUI() {
-    document.getElementById('uiName').innerText = myName;
-    document.getElementById('valMoney').innerText = Math.floor(myData.money).toLocaleString();
-    document.getElementById('valArea').innerText = myData.area.toLocaleString();
-    document.getElementById('valGDP').innerText = Math.floor(myData.gdp).toLocaleString();
-    document.getElementById('valMil').innerText = myData.military.toLocaleString();
-    const reqBox = document.getElementById('requestBox');
-    if(myData.requests && myData.requests.length > 0) {
-      reqBox.innerHTML = "";
-      myData.requests.forEach(sender => {
-        const div = document.createElement('div'); div.style.marginBottom = "5px";
-        div.innerHTML = `🤝 ${sender} <br> <button class="admin-edit-btn" onclick="acceptRequest('${sender}')">承諾</button> <button class="admin-edit-btn" style="color:red;" onclick="rejectRequest('${sender}')">却下</button>`;
-        reqBox.appendChild(div);
-      });
-    } else { reqBox.innerHTML = '<span style="color:#666;">申請はありません</span>'; }
-  }
-  function ecoTick() { const tax = parseInt(document.getElementById('taxRate').value) / 100; myData.money += myData.gdp * tax; refreshUI(); }
-  function invest() { if(myData.money>=2000){myData.money-=2000; myData.gdp+=500; refreshUI();}else alert("資金不足"); }
-  function recruit() { if(myData.money>=1000){myData.money-=1000; myData.military+=100; refreshUI();}else alert("資金不足"); }
-  async function manualSave() { const db=await getDB(); db.nations[myName]=myData; await saveDB(db); alert("保存完了"); }
-
-  function selectTarget(name) {
-    selectedTarget = name; document.getElementById('targetName').innerText = name;
-    document.getElementById('btnAlly').disabled = false; document.getElementById('btnWar').disabled = false;
-    const isAlly = myData.allies.includes(name);
-    document.getElementById('targetStatus').innerText = isAlly ? "同盟中" : "中立/敵対";
-    document.getElementById('targetStatus').style.color = isAlly ? "#00ff99" : "#ccc";
-  }
-
-  async function actionAlly() {
-    if(!selectedTarget || myData.allies.includes(selectedTarget)) return alert("不可");
-    const db = await getDB(); const targetNation = db.nations[selectedTarget]; if(!targetNation) return;
-    if(!targetNation.requests) targetNation.requests = [];
-    if(targetNation.requests.includes(myName)) return alert("申請済み");
-    targetNation.requests.push(myName); await saveDB(db); alert(`${selectedTarget} へ申請完了`);
-  }
-  async function acceptRequest(sender) {
-    const db = await getDB(); myData.requests = myData.requests.filter(r => r !== sender); myData.allies.push(sender);
-    if(db.nations[sender]) { if(!db.nations[sender].allies) db.nations[sender].allies = []; db.nations[sender].allies.push(myName); }
-    db.nations[myName] = myData; await saveDB(db); location.reload();
-  }
-  async function rejectRequest(sender) {
-    const db = await getDB(); myData.requests = myData.requests.filter(r => r !== sender);
-    db.nations[myName] = myData; await saveDB(db); refreshUI();
-  }
-  async function actionWar() {
-    if(!selectedTarget || myData.allies.includes(selectedTarget)) return alert("不可");
-    const db = await getDB(); const en = db.nations[selectedTarget]; if(!en) return;
-    if(!confirm(`${selectedTarget} に宣戦布告？`)) return;
-    const myPow = myData.military*(0.8+Math.random()*0.4); const enPow = en.military*(0.8+Math.random()*0.4);
-    if(myPow > enPow) {
-      const loot = Math.floor(en.money*0.5); en.money -= loot; myData.money += loot;
-      if(confirm(`勝利！ $${loot.toLocaleString()}を略奪。併合しますか？`)) {
-        myData.geometries = [turf.union(myData.geometries[0], en.geometries[0])];
-        myData.area += en.area; myData.gdp += Math.floor(en.gdp*0.5);
-        delete db.nations[selectedTarget]; alert("併合！");
-      }
-      db.nations[myName]=myData; if(db.nations[selectedTarget]) db.nations[selectedTarget]=en;
-      await saveDB(db); location.reload();
-    } else {
-      const loss = Math.floor(myData.money*0.3); myData.money -= loss; myData.military = Math.floor(myData.military*0.7);
-      alert(`敗北...`); db.nations[myName]=myData; await saveDB(db); refreshUI();
-    }
-  }
-
-  function attemptAdminLogin() {
-    const input = document.getElementById('adminKey').value.trim();
-    if(input === "201305042020302") {
-      localStorage.setItem('adminSession', 'active');
-      document.getElementById('overlayAdminAuth').classList.add('hidden');
-      document.getElementById('adminPanel').classList.remove('hidden');
-      refreshAdminList();
-    } else { alert("パスワード不一致"); }
-  }
-  function closeAdmin() { document.getElementById('adminPanel').classList.add('hidden'); }
-  function adminLogout() { localStorage.removeItem('adminSession'); location.reload(); }
-  
-  async function refreshAdminList() {
-    const t = document.getElementById('adminTableBody'); t.innerHTML = "読込中...";
-    const db = await getDB(); t.innerHTML = "";
-    Object.keys(db.nations||{}).forEach(k => {
-      const n = db.nations[k];
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><b>${k}</b></td>
-        <td>${n.pass} <button class="admin-edit-btn" onclick="adminEdit('${k}','pass','${n.pass}')">変</button></td>
-        <td>${n.money.toLocaleString()} <button class="admin-edit-btn" onclick="adminEdit('${k}','money',${n.money})">変</button></td>
-        <td>${n.area.toLocaleString()} <button class="admin-edit-btn" onclick="adminEdit('${k}','area',${n.area})">変</button></td>
-        <td>${n.gdp.toLocaleString()} <button class="admin-edit-btn" onclick="adminEdit('${k}','gdp',${n.gdp})">変</button></td>
-        <td>${n.military.toLocaleString()} <button class="admin-edit-btn" onclick="adminEdit('${k}','military',${n.military})">変</button></td>
-        <td><button class="btn-war" style="padding:5px;width:auto;background:red;" onclick="del('${k}')">削除</button></td>
-      `;
-      t.appendChild(tr);
-    });
-  }
-  async function adminEdit(country, key, currentVal) {
-    let newVal = prompt(`${country} の ${key} を変更？`, currentVal); if(newVal === null || newVal === "") return;
-    const db = await getDB();
-    if(key === 'pass') db.nations[country][key] = newVal;
-    else db.nations[country][key] = Number(newVal);
-    await saveDB(db); refreshAdminList();
-  }
-  async function del(name) { if(confirm("削除？")) { const db=await getDB(); delete db.nations[name]; await saveDB(db); refreshAdminList(); } }
 </script></body> </html>
