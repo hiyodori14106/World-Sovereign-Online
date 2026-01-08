@@ -137,12 +137,17 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
       <h3>軍備</h3>
       <button class="btn-war" onclick="recruit()">⚔️ 兵士雇用 (-$1000)</button>
        
+      <h3>外交申請</h3>
+      <div id="requestBox" style="background:#1a1a1a; padding:10px; border-radius:4px; max-height:100px; overflow-y:auto; margin-bottom:10px; font-size:0.85em;">
+         <span style="color:#666;">申請はありません</span>
+      </div>
+
       <h3>外交ターゲット</h3>
       <div class="stat-card" style="text-align:left; margin-bottom:10px;">
         ターゲット: <b id="targetName" style="color:var(--neon-blue)">なし</b><br>
         状態: <span id="targetStatus">---</span>
       </div>
-      <button class="btn-buy" id="btnAlly" onclick="actionAlly()" disabled>🤝 同盟</button>
+      <button class="btn-buy" id="btnAlly" onclick="actionAlly()" disabled>🤝 同盟申請を送る</button>
       <button class="btn-war" id="btnWar" onclick="actionWar()" disabled>💣 宣戦布告</button>
     </div>
 <!-- Flag Tab -->
@@ -191,7 +196,6 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
     }
   });
 
-  // --- View Controller ---
   function showScreen(id) {
     ['Main','Register','Login'].forEach(n => document.getElementById('menu'+n).classList.add('hidden'));
     document.getElementById('menu'+id).classList.remove('hidden');
@@ -203,30 +207,22 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
     event.target.classList.add('active');
   }
 
-  // --- Database ---
   async function getDB() {
-    try {
-      const r = await fetch(API_URL);
-      if(r.ok) return await r.json();
-    } catch(e){}
+    try { const r = await fetch(API_URL); if(r.ok) return await r.json(); } catch(e){}
     return { nations: {} };
   }
   async function saveDB(fullData) {
     await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(fullData) });
   }
 
-  // --- Auth Logic ---
   async function register() {
     const name = document.getElementById('regName').value;
     const pass = document.getElementById('regPass').value;
     if(!name || !pass) return alert("入力が不足しています");
     const db = await getDB();
     if(db.nations && db.nations[name]) return alert("その国名は既に存在します");
-    if(!db.nations) db.nations = {};
-    db.nations[name] = { pass: pass, money: 20000000, gdp: 5000, military: 500, area: 0, geometries: [], allies: [], flag: null };
-    await saveDB(db);
-    alert("建国完了。ログインしてください。");
-    showScreen('Login');
+    db.nations[name] = { pass: pass, money: 20000000, gdp: 5000, military: 500, area: 0, geometries: [], allies: [], requests: [], flag: null };
+    await saveDB(db); alert("建国完了。ログインしてください。"); showScreen('Login');
   }
   async function login(autoName, autoPass) {
     const name = autoName || document.getElementById('loginName').value;
@@ -237,18 +233,14 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
     const n = db.nations ? db.nations[name] : null;
     if(!n) { if(msg) msg.innerText="国が存在しません"; return; }
     if(n.pass !== pass) { if(msg) msg.innerText="パスワード不一致"; return; }
-    localStorage.setItem('autoName', name);
-    localStorage.setItem('autoPass', pass);
+    localStorage.setItem('autoName', name); localStorage.setItem('autoPass', pass);
     myName = name; myData = n;
     if(!myData.geometries) myData.geometries = [];
     if(!myData.allies) myData.allies = [];
+    if(!myData.requests) myData.requests = [];
     startGame(db);
   }
-  function doLogout() {
-    if(confirm("ログアウトしますか？")) {
-      localStorage.removeItem('autoName'); localStorage.removeItem('autoPass'); location.reload();
-    }
-  }
+  function doLogout() { if(confirm("ログアウトしますか？")) { localStorage.removeItem('autoName'); localStorage.removeItem('autoPass'); location.reload(); } }
   function startGame(db) {
     document.getElementById('overlayStart').classList.add('hidden');
     document.getElementById('gameUI').classList.remove('hidden');
@@ -256,7 +248,6 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
     setInterval(ecoTick, 5000);
   }
 
-  // --- Map System ---
   function initMap() {
     if(map) return;
     map = L.map('gameMap').setView([35, 135], 4);
@@ -313,7 +304,6 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
     });
   }
 
-  // --- Flag Editor ---
   let ctx, isDrawing=false; const PX=10;
   function initFlagEditor() {
     const c = document.getElementById('flagCanvas'); ctx = c.getContext('2d');
@@ -331,20 +321,32 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
   function clearFlag(){ctx.fillStyle="#fff"; ctx.fillRect(0,0,100,60);}
   async function saveFlag(){myData.flag=document.getElementById('flagCanvas').toDataURL(); await manualSave();}
 
-  // --- Game Logic ---
   function refreshUI() {
     document.getElementById('uiName').innerText = myName;
     document.getElementById('valMoney').innerText = Math.floor(myData.money).toLocaleString();
     document.getElementById('valArea').innerText = myData.area.toLocaleString();
     document.getElementById('valGDP').innerText = Math.floor(myData.gdp).toLocaleString();
     document.getElementById('valMil').innerText = myData.military.toLocaleString();
+    
+    // 申請リストの更新
+    const reqBox = document.getElementById('requestBox');
+    if(myData.requests && myData.requests.length > 0) {
+      reqBox.innerHTML = "";
+      myData.requests.forEach(sender => {
+        const div = document.createElement('div');
+        div.style.marginBottom = "5px";
+        div.innerHTML = `🤝 ${sender} <br> <button class="admin-edit-btn" onclick="acceptRequest('${sender}')">承諾</button> <button class="admin-edit-btn" style="color:red;" onclick="rejectRequest('${sender}')">却下</button>`;
+        reqBox.appendChild(div);
+      });
+    } else {
+      reqBox.innerHTML = '<span style="color:#666;">申請はありません</span>';
+    }
   }
   function ecoTick() { const tax = parseInt(document.getElementById('taxRate').value) / 100; myData.money += myData.gdp * tax; refreshUI(); }
   function invest() { if(myData.money>=2000){myData.money-=2000; myData.gdp+=500; refreshUI();}else alert("資金不足"); }
   function recruit() { if(myData.money>=1000){myData.money-=1000; myData.military+=100; refreshUI();}else alert("資金不足"); }
   async function manualSave() { const db=await getDB(); db.nations[myName]=myData; await saveDB(db); alert("保存完了"); }
 
-  // --- War / Diplo ---
   function selectTarget(name) {
     selectedTarget = name; document.getElementById('targetName').innerText = name;
     document.getElementById('btnAlly').disabled = false; document.getElementById('btnWar').disabled = false;
@@ -352,12 +354,48 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
     document.getElementById('targetStatus').innerText = isAlly ? "同盟中" : "中立/敵対";
     document.getElementById('targetStatus').style.color = isAlly ? "#00ff99" : "#ccc";
   }
+
+  // --- 同盟申請システム ---
   async function actionAlly() {
-    if(!selectedTarget || myData.allies.includes(selectedTarget)) return alert("不可");
-    myData.allies.push(selectedTarget); const db=await getDB(); db.nations[myName]=myData; await saveDB(db); location.reload();
+    if(!selectedTarget || myData.allies.includes(selectedTarget)) return alert("すでに同盟中か、国が選択されていません");
+    const db = await getDB();
+    const targetNation = db.nations[selectedTarget];
+    if(!targetNation) return;
+    if(!targetNation.requests) targetNation.requests = [];
+    if(targetNation.requests.includes(myName)) return alert("すでに申請済みです");
+    
+    targetNation.requests.push(myName);
+    await saveDB(db);
+    alert(`${selectedTarget} へ同盟申請を送りました。相手の承諾を待ってください。`);
   }
+
+  async function acceptRequest(sender) {
+    const db = await getDB();
+    // 自分のリストから申請を消して同盟へ
+    myData.requests = myData.requests.filter(r => r !== sender);
+    myData.allies.push(sender);
+    // 相手の同盟リストにも自分を追加
+    if(db.nations[sender]) {
+      if(!db.nations[sender].allies) db.nations[sender].allies = [];
+      db.nations[sender].allies.push(myName);
+    }
+    db.nations[myName] = myData;
+    await saveDB(db);
+    alert(`${sender} と同盟を結びました！`);
+    location.reload();
+  }
+
+  async function rejectRequest(sender) {
+    const db = await getDB();
+    myData.requests = myData.requests.filter(r => r !== sender);
+    db.nations[myName] = myData;
+    await saveDB(db);
+    alert("申請を却下しました");
+    refreshUI();
+  }
+
   async function actionWar() {
-    if(!selectedTarget || myData.allies.includes(selectedTarget)) return alert("不可");
+    if(!selectedTarget || myData.allies.includes(selectedTarget)) return alert("同盟国には攻撃できません");
     const db = await getDB(); const en = db.nations[selectedTarget]; if(!en) return;
     if(!confirm(`${selectedTarget} に宣戦布告しますか？`)) return;
     const myPow = myData.military*(0.8+Math.random()*0.4); const enPow = en.military*(0.8+Math.random()*0.4);
@@ -375,7 +413,6 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
     }
   }
 
-  // --- Admin System (Enhanced) ---
   function attemptAdminLogin() {
     const input = document.getElementById('adminKey').value.trim();
     if(input === "201305042020302") {
@@ -383,9 +420,7 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
       document.getElementById('overlayAdminAuth').classList.add('hidden');
       document.getElementById('adminPanel').classList.remove('hidden');
       refreshAdminList();
-    } else {
-      alert("管理者パスワードが違います");
-    }
+    } else { alert("管理者パスワードが違います"); }
   }
   function closeAdmin() { document.getElementById('adminPanel').classList.add('hidden'); }
   function adminLogout() { localStorage.removeItem('adminSession'); location.reload(); }
@@ -408,23 +443,13 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
       t.appendChild(tr);
     });
   }
-
   async function adminEdit(country, key, currentVal) {
     let newVal = prompt(`${country} の ${key} を変更しますか？`, currentVal);
     if(newVal === null || newVal === "") return;
-    
     const db = await getDB();
-    // パスワード以外は数値に変換
-    if(key === 'pass') {
-      db.nations[country][key] = newVal;
-    } else {
-      db.nations[country][key] = Number(newVal);
-    }
-    
-    await saveDB(db);
-    alert("更新しました");
-    refreshAdminList();
+    if(key === 'pass') db.nations[country][key] = newVal;
+    else db.nations[country][key] = Number(newVal);
+    await saveDB(db); alert("更新しました"); refreshAdminList();
   }
-
   async function del(name) { if(confirm("【警告】国「" + name + "」を完全に削除しますか？")) { const db=await getDB(); delete db.nations[name]; await saveDB(db); refreshAdminList(); } }
 </script></body> </html>
