@@ -1,4 +1,4 @@
-!DOCTYPE html><html lang="ja"> <head>  <meta charset="UTF-8">  <meta name="viewport" content="width=device-width, initial-scale=1.0">  <title>Global Strategy: Secure Ultimate</title>     <!-- Fonts -->  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">     <!-- Libraries: Leaflet, Draw, Turf(geometry math) -->  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>  <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
+<!DOCTYPE html><html lang="ja"> <head>  <meta charset="UTF-8">  <meta name="viewport" content="width=device-width, initial-scale=1.0">  <title>Global Strategy: Secure Ultimate</title>     <!-- Fonts -->  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">     <!-- Libraries: Leaflet, Draw, Turf(geometry math) -->  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>  <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
 <style>
     :root {
       --bg-color: #050505;
@@ -77,9 +77,10 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
       background: #000; border: 2px solid var(--neon-red); z-index: 10000;
       padding: 20px; overflow-y: auto; color: var(--neon-red);
     }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; color: #ccc; }
-    th, td { border: 1px solid #333; padding: 8px; text-align: left; }
-    th { background: #222; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; color: #ccc; font-size: 0.85em; }
+    th, td { border: 1px solid #333; padding: 8px; text-align: center; }
+    th { background: #222; color: var(--neon-red); }
+    .admin-edit-btn { background: #333; color: #00f3ff; border: 1px solid #555; padding: 2px 5px; font-size: 0.8em; cursor: pointer; }
   </style>
 </head> <body><!-- 1. Start / Menu Overlay --><div id="overlayStart" class="overlay">  <!-- Main Menu -->  <div id="menuMain" class="modal">    <h1>Global Strategy</h1>    <p style="color:#aaa;">領土争奪・国家運営シミュレーション</p>    <div id="loadingMsg" style="color:var(--neon-green); margin-bottom:10px; display:none;">自動ログイン中...</div>    <button class="btn-main" onclick="showScreen('Register')">🌍 新規建国</button>    <button class="btn-buy" onclick="showScreen('Login')">🔑 ログイン</button>  </div>
 <!-- Register -->
@@ -100,7 +101,7 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
     <button class="btn-sub" onclick="showScreen('Main')">戻る</button>
     <div id="loginMsg" style="color:red; margin-top:10px;"></div>
   </div>
-</div><!-- 2. Admin Auth Overlay --><div id="overlayAdminAuth" class="overlay hidden">  <div class="modal" style="border-color: var(--neon-red);">    <h2 style="color:var(--neon-red)">ADMIN AUTH</h2>    <p style="font-size:0.8em; color:gray;">Enter Admin Password</p>    <input type="password" id="adminKey" placeholder="Password">    <button class="btn-war" onclick="attemptAdminLogin()">UNLOCK</button>    <button class="btn-sub" onclick="document.getElementById('overlayAdminAuth').classList.add('hidden')">CANCEL</button>  </div> </div><!-- 3. Admin Panel (Hidden) --><div id="adminPanel" class="hidden">  <h2>⚠️ SERVER CONSOLE</h2>  <div style="margin-bottom:10px;">    <button class="btn-sub" style="width:100px;" onclick="closeAdmin()">CLOSE</button>    <button class="btn-main" style="width:150px;" onclick="refreshAdminList()">REFRESH</button>    <button class="btn-war" style="width:150px;" onclick="adminLogout()">LOGOUT</button>  </div>  <table>    <thead><tr><th>Country</th><th>Pass</th><th>Money ($)</th><th>Area</th><th>Action</th></tr></thead>    <tbody id="adminTableBody"></tbody>  </table> </div><!-- 4. Game Interface --><div id="gameUI" class="app-container hidden">  <div class="map-section">    <div id="gameMap"></div>    <div id="mapMsg" style="position:absolute; top:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.9); padding:15px; border:2px solid var(--neon-gold); color:var(--neon-gold); display:none; pointer-events:none; text-align:center;">      <b>【領土描画モード】</b><br>      空いている場所に領土を描いてください。<br>      <span style="font-size:0.8em; color:white;">他国と重なると無効になります。</span>    </div>  </div>
+</div><!-- 2. Admin Auth Overlay --><div id="overlayAdminAuth" class="overlay hidden">  <div class="modal" style="border-color: var(--neon-red);">    <h2 style="color:var(--neon-red)">管理者認証</h2>    <p style="font-size:0.8em; color:gray;">管理者パスワードを入力してください</p>    <input type="password" id="adminKey" placeholder="Password">    <button class="btn-war" onclick="attemptAdminLogin()">認証</button>    <button class="btn-sub" onclick="document.getElementById('overlayAdminAuth').classList.add('hidden')">キャンセル</button>  </div> </div><!-- 3. Admin Panel (Hidden) --><div id="adminPanel" class="hidden">  <h2>⚠️ サーバー管理コンソール</h2>  <div style="margin-bottom:10px;">    <button class="btn-sub" style="width:100px;" onclick="closeAdmin()">閉じる</button>    <button class="btn-main" style="width:150px;" onclick="refreshAdminList()">リスト更新</button>    <button class="btn-war" style="width:150px;" onclick="adminLogout()">管理ログアウト</button>  </div>  <table>    <thead><tr><th>国名</th><th>パスワード</th><th>資金 ($)</th><th>面積 (km²)</th><th>GDP ($)</th><th>軍事力</th><th>操作</th></tr></thead>    <tbody id="adminTableBody"></tbody>  </table> </div><!-- 4. Game Interface --><div id="gameUI" class="app-container hidden">  <div class="map-section">    <div id="gameMap"></div>    <div id="mapMsg" style="position:absolute; top:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.9); padding:15px; border:2px solid var(--neon-gold); color:var(--neon-gold); display:none; pointer-events:none; text-align:center;">      <b>【領土描画モード】</b><br>      空いている場所に領土を描いてください。<br>      <span style="font-size:0.8em; color:white;">他国と重なると無効になります。</span>    </div>  </div>
 <div class="sidebar">
     <h1><span id="uiName">NATION</span></h1>
      
@@ -138,8 +139,8 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
        
       <h3>外交ターゲット</h3>
       <div class="stat-card" style="text-align:left; margin-bottom:10px;">
-        Target: <b id="targetName" style="color:var(--neon-blue)">None</b><br>
-        Status: <span id="targetStatus">---</span>
+        ターゲット: <b id="targetName" style="color:var(--neon-blue)">なし</b><br>
+        状態: <span id="targetStatus">---</span>
       </div>
       <button class="btn-buy" id="btnAlly" onclick="actionAlly()" disabled>🤝 同盟</button>
       <button class="btn-war" id="btnWar" onclick="actionWar()" disabled>💣 宣戦布告</button>
@@ -153,7 +154,7 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
       <button class="btn-sub" onclick="clearFlag()">🗑 クリア</button>
     </div>
      
-    <div style="margin-top:auto; font-size:0.7em; color:#555; text-align:center;">Shift+Alt: Admin</div>
+    <div style="margin-top:auto; font-size:0.7em; color:#555; text-align:center;">Shift+Alt: 管理パネル</div>
   </div>
 </div><script>
   // --- Configuration ---
@@ -374,30 +375,56 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
     }
   }
 
-  // --- Admin System (修正点) ---
+  // --- Admin System (Enhanced) ---
   function attemptAdminLogin() {
     const input = document.getElementById('adminKey').value.trim();
-    // 暗号化APIを使わない直接比較に切り替え（ローカル環境でも動くようにするため）
     if(input === "201305042020302") {
       localStorage.setItem('adminSession', 'active');
       document.getElementById('overlayAdminAuth').classList.add('hidden');
       document.getElementById('adminPanel').classList.remove('hidden');
       refreshAdminList();
     } else {
-      alert("Password Incorrect");
+      alert("管理者パスワードが違います");
     }
   }
   function closeAdmin() { document.getElementById('adminPanel').classList.add('hidden'); }
   function adminLogout() { localStorage.removeItem('adminSession'); location.reload(); }
+  
   async function refreshAdminList() {
-    const t = document.getElementById('adminTableBody'); t.innerHTML = "Loading...";
+    const t = document.getElementById('adminTableBody'); t.innerHTML = "読込中...";
     const db = await getDB(); t.innerHTML = "";
     Object.keys(db.nations||{}).forEach(k => {
       const n = db.nations[k];
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${k}</td><td>${n.pass}</td><td>${n.money.toLocaleString()}</td><td>${n.area}</td><td><button class="btn-war" style="padding:5px;width:auto;" onclick="del('${k}')">DEL</button></td>`;
+      tr.innerHTML = `
+        <td><b>${k}</b></td>
+        <td>${n.pass} <button class="admin-edit-btn" onclick="adminEdit('${k}','pass','${n.pass}')">変</button></td>
+        <td>${n.money.toLocaleString()} <button class="admin-edit-btn" onclick="adminEdit('${k}','money',${n.money})">変</button></td>
+        <td>${n.area.toLocaleString()} <button class="admin-edit-btn" onclick="adminEdit('${k}','area',${n.area})">変</button></td>
+        <td>${n.gdp.toLocaleString()} <button class="admin-edit-btn" onclick="adminEdit('${k}','gdp',${n.gdp})">変</button></td>
+        <td>${n.military.toLocaleString()} <button class="admin-edit-btn" onclick="adminEdit('${k}','military',${n.military})">変</button></td>
+        <td><button class="btn-war" style="padding:5px;width:auto;background:red;" onclick="del('${k}')">削除</button></td>
+      `;
       t.appendChild(tr);
     });
   }
-  async function del(name) { if(confirm("Delete " + name + "?")) { const db=await getDB(); delete db.nations[name]; await saveDB(db); refreshAdminList(); } }
+
+  async function adminEdit(country, key, currentVal) {
+    let newVal = prompt(`${country} の ${key} を変更しますか？`, currentVal);
+    if(newVal === null || newVal === "") return;
+    
+    const db = await getDB();
+    // パスワード以外は数値に変換
+    if(key === 'pass') {
+      db.nations[country][key] = newVal;
+    } else {
+      db.nations[country][key] = Number(newVal);
+    }
+    
+    await saveDB(db);
+    alert("更新しました");
+    refreshAdminList();
+  }
+
+  async function del(name) { if(confirm("【警告】国「" + name + "」を完全に削除しますか？")) { const db=await getDB(); delete db.nations[name]; await saveDB(db); refreshAdminList(); } }
 </script></body> </html>
