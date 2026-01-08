@@ -1,606 +1,611 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
- <meta charset="UTF-8">
- <meta name="viewport" content="width=device-width, initial-scale=1.0">
- <title>Global Nations - Fixed & Stable</title>
- <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Strategy: Ultimate</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet & Modules -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <!-- Turf.js (地形計算ライブラリ：重なり判定用) -->
+    <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
 
- <style>
-  /* --- 基本設定 --- */
-  :root {
-   --bg-body: #f1f5f9;
-   --bg-sidebar: #0f172a;
-   --bg-card: #ffffff;
-   --text-main: #334155;
-   --text-muted: #94a3b8;
-   --primary: #3b82f6;
-   --accent: #f59e0b;
-   --danger: #ef4444;
-   --success: #10b981;
-   --border: #e2e8f0;
-  }
-  * { box-sizing: border-box; }
-  body {
-   font-family: 'Nunito', "Helvetica Neue", Arial, sans-serif;
-   background-color: var(--bg-body);
-   color: var(--text-main);
-   margin: 0;
-   height: 100vh;
-   display: flex;
-   overflow: hidden; /* 全体スクロール禁止 */
-  }
+    <style>
+        :root {
+            --bg-color: #080808;
+            --panel-bg: rgba(20, 25, 30, 0.95);
+            --neon-blue: #00f3ff;
+            --neon-red: #ff0055;
+            --neon-green: #00ff99;
+            --neon-gold: #ffcc00;
+        }
 
-  /* --- サイドバー --- */
-  .sidebar {
-   width: 260px;
-   background-color: var(--bg-sidebar);
-   color: white;
-   display: flex;
-   flex-direction: column;
-   padding: 20px;
-   flex-shrink: 0;
-   z-index: 50;
-   box-shadow: 4px 0 10px rgba(0,0,0,0.1);
-  }
-  .brand { font-size: 1.4rem; font-weight: 900; color: var(--primary); text-align: center; margin-bottom: 20px; }
-  .brand span { color: white; }
-  .nation-info {
-   background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px;
-   margin-bottom: 20px; text-align: center; border: 1px solid rgba(255,255,255,0.1);
-  }
-  #disp-name { margin: 10px 0 5px; font-size: 1.1rem; font-weight: 800; }
-  .flag-display {
-   width: 80px; height: 50px; margin: 0 auto;
-   display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(5, 1fr);
-   border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-  }
-  .stat-list { flex: 1; overflow-y: auto; padding-right: 5px; }
-  .stat-row {
-   display: flex; justify-content: space-between; padding: 8px 0;
-   border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 0.9rem;
-  }
-  .stat-val { font-weight: 700; color: var(--accent); }
-  .sidebar-footer { margin-top: auto; padding-top: 20px; text-align: center; font-size: 0.75rem; color: var(--text-muted); }
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: var(--bg-color);
+            color: #e0e6ed;
+            margin: 0; padding: 0;
+            height: 100vh; overflow: hidden;
+        }
 
-  /* --- メインエリア --- */
-  .main-content {
-   flex: 1;
-   display: flex;
-   flex-direction: column;
-   background: #f8fafc;
-   min-width: 0;
-  }
+        .app-container { display: flex; height: 100%; }
+        .map-section { flex: 1; position: relative; }
+        #gameMap { width: 100%; height: 100%; background: #0b0b0b; }
 
-  header {
-   flex: 0 0 auto;
-   background: var(--bg-card); padding: 15px 30px;
-   display: flex; justify-content: space-between; align-items: center;
-   border-bottom: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-  }
-  header h3 { margin: 0; font-weight: 800; color: var(--bg-sidebar); font-size: 1.3rem; }
-  .total-score { background: var(--bg-body); padding: 8px 16px; border-radius: 8px; font-weight: bold; border: 1px solid var(--border); }
+        /* Sidebar */
+        .sidebar {
+            width: 360px;
+            background: var(--panel-bg);
+            border-left: 1px solid #333;
+            display: flex; flex-direction: column;
+            padding: 15px;
+            box-shadow: -5px 0 20px rgba(0,0,0,0.8);
+            z-index: 100;
+            overflow-y: auto;
+        }
 
-  /* タブ設定（下に配置するため調整） */
-  .tabs {
-   flex: 0 0 auto;
-   display: flex; background: white; padding: 0 20px;
-   box-shadow: 0 -2px 4px rgba(0,0,0,0.05); z-index: 10;
-   border-top: 1px solid var(--border);
-  }
-  .tab-btn {
-   flex: 1; padding: 15px; border: none; background: transparent;
-   font-weight: 700; color: var(--text-muted); cursor: pointer; transition: 0.2s;
-  }
-  .tab-btn:hover { color: var(--primary); background: #f1f5f9; }
-  .tab-btn.active { 
-    color: var(--primary); 
-    background: #eff6ff; 
-    border-top: 3px solid var(--primary); /* アクティブ線を上に */
-    border-bottom: none;
-  }
+        h1 { color: var(--neon-blue); text-align: center; font-family: 'Orbitron'; font-size: 1.4em; border-bottom: 2px solid var(--neon-blue); padding-bottom: 10px; margin-top: 0; }
+        h3 { color: var(--neon-gold); font-size: 0.9em; margin-top: 15px; border-left: 3px solid var(--neon-gold); padding-left: 8px; font-family: 'Orbitron'; }
 
-  /* コンテンツ表示エリア */
-  #content-area {
-   flex: 1;
-   position: relative;
-   overflow-y: auto;
-   padding: 20px;
-  }
+        /* Stats */
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
+        .stat-card { background: #1a1a1a; padding: 8px; border-radius: 4px; text-align: center; border: 1px solid #333; }
+        .stat-val { font-family: 'Orbitron'; font-size: 1.1em; color: white; display: block; }
+        .stat-label { font-size: 0.7em; color: #888; }
 
-  .panel { display: none; padding-bottom: 50px; }
-  .panel.active { display: block; animation: fadeIn 0.3s ease; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        /* Buttons */
+        button {
+            width: 100%; padding: 10px; margin-bottom: 5px;
+            border: none; border-radius: 4px; cursor: pointer; font-weight: bold;
+            font-family: 'Noto Sans JP'; transition: 0.2s;
+        }
+        button:hover { filter: brightness(1.2); }
+        button:disabled { filter: grayscale(1); cursor: not-allowed; opacity: 0.5; }
+        .btn-main { background: var(--neon-blue); color: black; }
+        .btn-war { background: var(--neon-red); color: white; }
+        .btn-buy { background: var(--neon-green); color: black; }
+        .btn-sub { background: #333; color: #ccc; }
 
-  /* カード & UI */
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  .card {
-   background: var(--bg-card); border-radius: 12px; padding: 20px; margin-bottom: 20px;
-   box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid var(--border);
-  }
-  .card h4 {
-   margin-top: 0; margin-bottom: 15px; color: var(--bg-sidebar);
-   font-size: 1.05rem; border-left: 4px solid var(--primary); padding-left: 10px;
-  }
-  button {
-   background: var(--primary); color: white; border: none; padding: 12px;
-   border-radius: 8px; font-weight: 700; cursor: pointer; width: 100%;
-   margin-bottom: 8px; transition: 0.2s;
-  }
-  button:hover { filter: brightness(1.1); transform: translateY(-1px); }
-  button.danger { background: var(--danger); }
-  button.secondary { background: #64748b; }
-   
-  input[type="text"], input[type="range"] {
-   width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: #f8fafc;
-  }
+        input { background: #222; border: 1px solid #555; color: white; padding: 10px; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
 
-  /* マップ */
-  .map-container {
-   display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
-   background: #334155; padding: 10px; border-radius: 12px;
-   max-width: 400px; margin: 0 auto;
-   min-height: 300px;
-  }
-  .map-tile {
-   aspect-ratio: 1 / 1; background-color: #cbd5e1; border-radius: 4px;
-   cursor: pointer; display: flex; justify-content: center; align-items: center;
-   position: relative; border-bottom: 3px solid rgba(0,0,0,0.2);
-  }
-  .map-tile:hover { transform: scale(1.05); z-index: 5; border-color: white; }
-  .map-legend { font-size: 0.8rem; color: var(--text-muted); margin-top: 10px; text-align: center; }
+        /* Tabs */
+        .tabs { display: flex; gap: 2px; margin-bottom: 10px; }
+        .tab { flex: 1; padding: 8px; background: #222; color: #888; text-align: center; cursor: pointer; font-size: 0.8em; }
+        .tab.active { background: #333; color: var(--neon-blue); border-bottom: 2px solid var(--neon-blue); }
 
-  /* チャット & ランキング */
-  .chat-area {
-   height: 300px; background: #f1f5f9; border: 1px solid var(--border);
-   border-radius: 8px; padding: 15px; overflow-y: auto; margin-bottom: 10px;
-  }
-  .chat-msg {
-   margin-bottom: 8px; padding: 8px 12px; border-radius: 8px; background: white;
-   box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 0.9rem;
-  }
-  .rank-item {
-   display: flex; justify-content: space-between; align-items: center;
-   padding: 10px; border-bottom: 1px solid var(--border);
-  }
-  .rank-myself { background-color: #eff6ff; border-left: 3px solid var(--primary); }
+        /* Flag Editor */
+        canvas { border: 1px solid #555; background: #000; cursor: crosshair; image-rendering: pixelated; margin: 0 auto; display: block;}
+        .palette { display: flex; justify-content: center; gap: 5px; margin-top: 5px; flex-wrap: wrap;}
+        .color-dot { width: 20px; height: 20px; border-radius: 50%; border: 1px solid #fff; cursor: pointer; }
 
-  /* モーダル */
-  #modal-overlay {
-   position: fixed; inset: 0; background: rgba(15, 23, 42, 0.95);
-   backdrop-filter: blur(5px); display: flex; justify-content: center; align-items: center; z-index: 3000;
-  }
-  .modal-box {
-   background: white; padding: 30px; border-radius: 20px; width: 420px; text-align: center;
-   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  }
-  .editor-grid {
-   display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(5, 1fr); gap: 1px;
-   background: #94a3b8; width: 240px; height: 150px; margin: 15px auto; border: 4px solid #334155;
-  }
-  .editor-pixel { background-color: white; cursor: pointer; }
-  .color-palette { display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
-  .color-btn { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #e2e8f0; cursor: pointer; }
-  .color-btn.selected { border-color: #334155; transform: scale(1.2); }
-  .hidden { display: none !important; }
- </style>
+        /* Overlays */
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 9999;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .modal {
+            background: #111; border: 1px solid var(--neon-blue); padding: 30px;
+            width: 400px; max-width: 90%; text-align: center; border-radius: 8px;
+            box-shadow: 0 0 30px rgba(0,243,255,0.1);
+        }
+        .hidden { display: none !important; }
+        
+        /* Popup Flag */
+        .pop-flag { width: 80px; height: 50px; border: 1px solid #ccc; display: block; margin: 0 auto 5px auto; image-rendering: pixelated; }
+
+        /* Admin Panel */
+        #adminPanel {
+            position: fixed; top: 50px; left: 50px; right: 50px; bottom: 50px;
+            background: #000; border: 2px solid var(--neon-red); z-index: 10000;
+            padding: 20px; overflow-y: auto; color: var(--neon-red);
+        }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; color: #ccc; }
+        th, td { border: 1px solid #333; padding: 8px; text-align: left; }
+        th { background: #222; }
+    </style>
 </head>
 <body>
 
- <!-- 建国モーダル -->
- <div id="modal-overlay">
-  <div class="modal-box">
-   <h1 style="color:var(--bg-sidebar); margin:0 0 10px 0;">Global Nations</h1>
-   <p style="color:var(--text-muted); margin-bottom:20px;">建国して世界を征服しよう</p>
-   
-   <div style="text-align:left;">
-    <label style="font-size:0.9rem; font-weight:bold; display:block; margin-bottom:5px;">国名</label>
-    <input type="text" id="inp-name" placeholder="例: スクラッチ帝国" maxlength="12">
-     
-    <div style="margin-top:20px; text-align:center;">
-     <label style="font-size:0.9rem; font-weight:bold; display:block; margin-bottom:10px;">国旗デザイン</label>
-     <div class="color-palette" id="palette"></div>
-     <div class="editor-grid" id="flag-editor"></div>
-    </div>
-   </div>
-    
-   <button onclick="startGame()" style="font-size:1.1rem; padding:12px; margin-top:20px;">🚀 建国する</button>
-  </div>
- </div>
-
- <div id="app" class="hidden">
-  <!-- サイドバー -->
-  <div class="sidebar">
-   <div class="brand">GLOBAL <span>NATIONS</span></div>
-    
-   <div class="nation-info">
-    <div id="disp-flag" class="flag-display"></div>
-    <h2 id="disp-name">Unknown</h2>
-   </div>
-    
-   <div class="stat-list">
-    <div class="stat-row"><span class="stat-icon"><i class="fas fa-coins"></i></span> <span>資金</span> <span class="stat-val" id="val-money">0</span></div>
-    <div class="stat-row"><span class="stat-icon"><i class="fas fa-users"></i></span> <span>人口</span> <span class="stat-val" id="val-pop">0</span></div>
-    <div class="stat-row"><span class="stat-icon"><i class="fas fa-hamburger"></i></span> <span>食料</span> <span class="stat-val" id="val-food">0</span></div>
-    <div class="stat-row"><span class="stat-icon"><i class="fas fa-oil-can"></i></span> <span>石油</span> <span class="stat-val" id="val-oil">0</span></div>
-    <div class="stat-row"><span class="stat-icon"><i class="fas fa-cubes"></i></span> <span>資材</span> <span class="stat-val" id="val-mat">0</span></div>
-    <div class="stat-row"><span class="stat-icon"><i class="fas fa-fighter-jet"></i></span> <span>軍事</span> <span class="stat-val" id="val-mil">0</span></div>
-    <div class="stat-row"><span class="stat-icon"><i class="fas fa-heart"></i></span> <span>支持</span> <span class="stat-val" id="val-app">0%</span></div>
-   </div>
-
-   <div class="sidebar-footer">
-    <i class="fas fa-cloud-upload-alt"></i> 自動同期中
-   </div>
-  </div>
-
-  <!-- メインコンテンツ -->
-  <div class="main-content">
-   <header>
-    <h3 id="panel-title"><i class="fas fa-home"></i> ダッシュボード</h3>
-    <div class="total-score">国力: <b id="my-total-score">0</b></div>
-   </header>
-
-   <!-- 【入れ替え】コンテンツ表示エリアを上に配置 -->
-   <div id="content-area">
-     
-    <!-- 1. ダッシュボード -->
-    <div id="tab-dashboard" class="panel active">
-     <div class="card">
-      <h4><i class="fas fa-poll"></i> 国民支持率</h4>
-      <div style="background:#e2e8f0; height:12px; border-radius:6px; margin-top:10px; overflow:hidden;">
-       <div id="approval-bar" style="width: 50%; background: var(--success); height:100%; transition: width 0.5s;"></div>
-      </div>
-     </div>
-
-     <div class="grid-2">
-      <div class="card">
-       <h4><i class="fas fa-hard-hat"></i> 公共事業</h4>
-       <p style="font-size:0.9rem;">インフラを整備して人口を増やします。</p>
-       <button onclick="actionInvest()">インフラ整備 (💰500, 🧱10)</button>
-      </div>
-      <div class="card">
-       <h4><i class="fas fa-bullhorn"></i> メディア戦略</h4>
-       <p style="font-size:0.9rem;">プロパガンダ放送で支持率を回復します。</p>
-       <button onclick="actionPropaganda()">放送実施 (💰200)</button>
-      </div>
-     </div>
-      
-     <div class="card">
-      <h4><i class="fas fa-list-alt"></i> システムログ</h4>
-      <div id="log-list" style="font-size:0.85rem; color:#64748b; height:120px; overflow-y:auto; font-family:monospace;"></div>
-     </div>
+<!-- Start / Login -->
+<div id="overlayStart" class="overlay">
+    <div id="menuMain" class="modal">
+        <h1>Global Strategy</h1>
+        <p style="color:#aaa;">領土争奪・国家運営シミュレーション</p>
+        <button class="btn-main" onclick="showScreen('Register')">🌍 新規建国 (パスワード設定)</button>
+        <button class="btn-buy" onclick="showScreen('Login')">🔑 ログイン</button>
     </div>
 
-    <!-- 2. 経済 -->
-    <div id="tab-economy" class="panel">
-     <div class="card">
-      <h4><i class="fas fa-percentage"></i> 税率: <span id="tax-disp" style="color:var(--primary);">20</span>%</h4>
-      <input type="range" id="tax-slider" min="0" max="50" value="20" oninput="updateTaxDisp()">
-     </div>
-
-     <div class="grid-2">
-      <div class="card">
-       <h4><i class="fas fa-shopping-cart"></i> 資源市場</h4>
-       <button class="secondary" onclick="buyResource('food', 100, 50)"><i class="fas fa-hamburger"></i> 食料 (💰100)</button>
-       <button class="secondary" onclick="buyResource('oil', 200, 20)"><i class="fas fa-oil-can"></i> 石油 (💰200)</button>
-       <button class="secondary" onclick="buyResource('mat', 150, 30)"><i class="fas fa-cubes"></i> 資材 (💰150)</button>
-      </div>
-      <div class="card">
-       <h4><i class="fas fa-university"></i> 世界銀行</h4>
-       <p>借金: <span id="val-debt" style="color:var(--danger); font-weight:bold;">0</span></p>
-       <button onclick="takeLoan()">借入 💰1000</button>
-       <button onclick="repayLoan()" style="background:var(--success);">返済 💰1100</button>
-      </div>
-     </div>
+    <div id="menuRegister" class="modal hidden">
+        <h2>新規建国</h2>
+        <input type="text" id="regName" placeholder="国名 (重複不可)">
+        <input type="password" id="regPass" placeholder="パスワード">
+        <p style="font-size:0.8em; color:gray;">※初期資金: $20,000,000 付与</p>
+        <button class="btn-main" onclick="register()">アカウント作成</button>
+        <button class="btn-sub" onclick="showScreen('Main')">戻る</button>
     </div>
 
-    <!-- 3. マップ & 戦争 -->
-    <div id="tab-map" class="panel">
-     <div class="card map-wrapper">
-       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-         <h4 style="margin:0;"><i class="fas fa-map"></i> 領土マップ</h4>
-         <button style="width:auto; padding:5px 10px; font-size:0.8rem;" onclick="syncWithCloud(false)"><i class="fas fa-sync"></i></button>
-       </div>
-       <div class="map-container" id="world-map"></div>
-       <div class="map-legend">
-         <span style="margin-right:10px;"><i class="fas fa-square" style="color:#cbd5e1;"></i> 空き地 (💰300)</span>
-         <span><i class="fas fa-star" style="color:#fbbf24;"></i> 自国領</span>
-       </div>
-     </div>
+    <div id="menuLogin" class="modal hidden">
+        <h2>入国審査</h2>
+        <input type="text" id="loginName" placeholder="国名">
+        <input type="password" id="loginPass" placeholder="パスワード">
+        <button class="btn-buy" onclick="login()">ログイン</button>
+        <button class="btn-sub" onclick="showScreen('Main')">戻る</button>
+        <div id="loginMsg" style="color:red; margin-top:10px;"></div>
+    </div>
+</div>
 
-     <div class="card">
-       <h4><i class="fas fa-shield-alt"></i> 軍司令部</h4>
-       <p style="font-size:0.9rem; color:#64748b;">他国の領土を攻撃して拡大します。</p>
-       <div class="grid-2">
-         <button onclick="recruit()" class="secondary"><i class="fas fa-user-plus"></i> 徴兵 (💰200)</button>
-         <button onclick="train()" class="secondary"><i class="fas fa-dumbbell"></i> 訓練 (💰300)</button>
-       </div>
-       <div style="margin-top:10px;">
-         <button onclick="buildDefense()"><i class="fas fa-dungeon"></i> 防衛強化 (💰1000)</button>
-       </div>
-     </div>
+<!-- Admin Auth -->
+<div id="overlayAdminAuth" class="overlay hidden">
+    <div class="modal" style="border-color: var(--neon-red);">
+        <h2 style="color:var(--neon-red)">ADMIN AUTH</h2>
+        <input type="password" id="adminKey" placeholder="Password">
+        <button class="btn-war" onclick="openAdminPanel()">LOGIN</button>
+        <button class="btn-sub" onclick="document.getElementById('overlayAdminAuth').classList.add('hidden')">CANCEL</button>
+    </div>
+</div>
+
+<!-- Admin Panel -->
+<div id="adminPanel" class="hidden">
+    <h2⚠️ SERVER CONSOLE</h2>
+    <button class="btn-sub" style="width:100px;" onclick="document.getElementById('adminPanel').classList.add('hidden')">CLOSE</button>
+    <button class="btn-main" style="width:150px;" onclick="refreshAdminList()">REFRESH</button>
+    <table>
+        <thead><tr><th>Country</th><th>Pass</th><th>Money ($)</th><th>Area</th><th>Action</th></tr></thead>
+        <tbody id="adminTableBody"></tbody>
+    </table>
+</div>
+
+<!-- Game UI -->
+<div id="gameUI" class="app-container hidden">
+    <div class="map-section">
+        <div id="gameMap"></div>
+        <div id="mapMsg" style="position:absolute; top:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.9); padding:15px; border:2px solid var(--neon-gold); color:var(--neon-gold); display:none; pointer-events:none; text-align:center;">
+            <b>【領土描画モード】</b><br>
+            空いている場所に領土を描いてください。<br>
+            <span style="font-size:0.8em; color:white;">他国と重なると無効になります。</span>
+        </div>
     </div>
 
-    <!-- 4. 外交 -->
-    <div id="tab-diplomacy" class="panel">
-     <div class="grid-2">
-      <div class="card">
-       <h4><i class="fas fa-trophy"></i> 世界ランキング</h4>
-       <div id="leaderboard">読み込み中...</div>
-      </div>
-      <div class="card">
-       <h4><i class="fas fa-comments"></i> 国際チャット</h4>
-       <div class="chat-area" id="global-chat"></div>
-       <div style="display:flex;">
-        <input type="text" id="chat-input" placeholder="メッセージを入力..." style="flex:1;">
-        <button onclick="sendChat()" style="width:auto; margin-left:10px; margin-bottom:0;"><i class="fas fa-paper-plane"></i></button>
-       </div>
-      </div>
-     </div>
+    <div class="sidebar">
+        <h1><span id="uiName">NATION</span></h1>
+        
+        <div class="stats-grid">
+            <div class="stat-card"><span class="stat-label">資金</span><span class="stat-val" id="valMoney">0</span><span style="font-size:0.7em">$</span></div>
+            <div class="stat-card"><span class="stat-label">面積</span><span class="stat-val" id="valArea">0</span><span style="font-size:0.7em">km²</span></div>
+            <div class="stat-card"><span class="stat-label">GDP</span><span class="stat-val" id="valGDP">0</span><span style="font-size:0.7em">$</span></div>
+            <div class="stat-card"><span class="stat-label">軍事力</span><span class="stat-val" id="valMil">0</span></div>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="setTab('main')">内政</div>
+            <div class="tab" onclick="setTab('war')">外交・軍事</div>
+            <div class="tab" onclick="setTab('flag')">国旗</div>
+        </div>
+
+        <!-- Main -->
+        <div id="tab-main">
+            <h3>経済</h3>
+            <button class="btn-main" onclick="invest()">🏭 産業投資 (-$2000)</button>
+            <div style="margin-top:5px; font-size:0.8em; color:#aaa;">
+                所得税: <span id="taxVal">10</span>%
+                <input type="range" id="taxRate" min="0" max="50" value="10" onchange="document.getElementById('taxVal').innerText=this.value">
+            </div>
+            
+            <h3>領土管理</h3>
+            <p style="font-size:0.8em; color:#aaa;">コスト: $100 / km²</p>
+            <button class="btn-buy" onclick="startExpansion()">🗺️ 領土購入・描画</button>
+
+            <h3>システム</h3>
+            <button class="btn-sub" onclick="manualSave()">💾 サーバー保存</button>
+            <button class="btn-sub" onclick="location.reload()">ログアウト</button>
+        </div>
+
+        <!-- War -->
+        <div id="tab-war" class="hidden">
+            <h3>軍備増強</h3>
+            <button class="btn-war" onclick="recruit()">⚔️ 兵士雇用 (-$1000)</button>
+            
+            <h3>ターゲット選択</h3>
+            <div class="stat-card" style="text-align:left; margin-bottom:10px;">
+                Target: <b id="targetName" style="color:var(--neon-blue)">None</b><br>
+                Status: <span id="targetStatus">---</span>
+            </div>
+            <button class="btn-buy" id="btnAlly" onclick="actionAlly()" disabled>🤝 同盟</button>
+            <button class="btn-war" id="btnWar" onclick="actionWar()" disabled>💣 宣戦布告</button>
+        </div>
+
+        <!-- Flag -->
+        <div id="tab-flag" class="hidden">
+            <h3>国旗デザイン</h3>
+            <canvas id="flagCanvas" width="100" height="60"></canvas>
+            <div class="palette" id="paletteBox"></div>
+            <button class="btn-main" style="margin-top:10px;" onclick="saveFlag()">💾 国旗を保存</button>
+            <button class="btn-sub" onclick="clearFlag()">🗑 クリア</button>
+        </div>
+        
+        <div style="margin-top:auto; font-size:0.7em; color:#555; text-align:center;">Shift+Alt: Admin</div>
     </div>
-   </div>
+</div>
 
-   <!-- 【入れ替え】タブを下に配置 -->
-   <div class="tabs">
-    <button class="tab-btn active" id="btn-dashboard" onclick="switchTab('dashboard')"><i class="fas fa-chart-pie"></i> 内政</button>
-    <button class="tab-btn" id="btn-economy" onclick="switchTab('economy')"><i class="fas fa-hand-holding-usd"></i> 経済</button>
-    <button class="tab-btn" id="btn-map" onclick="switchTab('map')"><i class="fas fa-map-marked-alt"></i> 地図</button>
-    <button class="tab-btn" id="btn-diplomacy" onclick="switchTab('diplomacy')"><i class="fas fa-globe"></i> 外交</button>
-   </div>
+<script>
+    // --- Configuration ---
+    const PANTRY_ID = "6ac44d17-1f5d-4931-a51f-9a540cca1ef7"; 
+    const BASKET_NAME = "strategy_ultimate_v1"; 
+    const API_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/${BASKET_NAME}`;
+    const ADMIN_PASS = "admin"; // 管理者パスワード
 
-  </div>
- </div>
+    // --- Global State ---
+    let myName = "", myData = {};
+    let map, drawnItems, drawControl;
+    let selectedTarget = null;
+    let expansionMode = false;
+    let allNationsCache = {};
 
- <script>
-  // 前のコードから一切変更なし
-  const PANTRY_ID = "9C9B3581-6D5B-48A0-8C04-d32DBFE128A8"; 
-  const BASKET_NAME = "global_nations_v13_stable"; 
-  const API_URL = `https://getpantry.cloud/apiv1/pantry/${}/basket/${}`;
-
-  let editColor = "#3b82f6";
-  let flagPixels = new Array(40).fill("#ffffff"); 
-  const colors = ["#ef4444", "#3b82f6", "#10b981", "#f59e0b", "#ffffff", "#000000", "#6366f1", "#8b5cf6"];
-
-  let gameData = {
-   name: "Player",
-   flag: new Array(40).fill("#ffffff"), 
-   money: 1000, pop: 100, food: 200, oil: 50, mat: 50, mil: 50, app: 80, debt: 0, tax: 20, day: 1, defense: 0
-  };
-
-  let cloudData = { nations: {}, chat: [], map: new Array(25).fill({owner: null, flag: null}), battles: [] }; 
-
-  window.onload = function() {
-   initFlagEditor();
-   renderMap();
-
-   if(localStorage.getItem("gn_save_v13")) {
-    const saved = JSON.parse(localStorage.getItem("gn_save_v13"));
-    gameData = {...gameData, ...saved};
-    flagPixels = gameData.flag || new Array(40).fill("#ffffff");
-    document.getElementById('modal-overlay').classList.add('hidden');
-    document.getElementById('app').classList.remove('hidden');
-    updateUI(); startGameLoop(); syncWithCloud(true);
-    setInterval(() => syncWithCloud(false), 5000);
-   }
-  };
-
-  function switchTab(tabName) {
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    document.getElementById('tab-' + tabName).classList.add('active');
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('btn-' + tabName).classList.add('active');
-    const titles = { 'dashboard': '<i class="fas fa-home"></i> ダッシュボード', 'economy': '<i class="fas fa-hand-holding-usd"></i> 経済', 'map': '<i class="fas fa-map-marked-alt"></i> 地図・戦争', 'diplomacy': '<i class="fas fa-globe"></i> 外交' };
-    document.getElementById('panel-title').innerHTML = titles[tabName];
-  }
-
-  function initFlagEditor() {
-   const p = document.getElementById('palette');
-   colors.forEach(c => {
-    const d = document.createElement('div');
-    d.className = 'color-btn'; d.style.backgroundColor = c;
-    if(c === editColor) d.classList.add('selected');
-    d.onclick = () => { editColor = c; document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('selected')); d.classList.add('selected'); };
-    p.appendChild(d);
-   });
-   renderEditorGrid();
-  }
-
-  function renderEditorGrid() {
-   const grid = document.getElementById('flag-editor');
-   grid.innerHTML = "";
-   flagPixels.forEach((col, i) => {
-    const pix = document.createElement('div');
-    pix.className = 'editor-pixel'; pix.style.backgroundColor = col;
-    pix.onclick = () => { flagPixels[i] = editColor; pix.style.backgroundColor = editColor; };
-    grid.appendChild(pix);
-   });
-  }
-
-  function renderMiniFlag(container, pixels) {
-    container.innerHTML = "";
-    if(!pixels || pixels.length === 0) pixels = new Array(40).fill("#eee");
-    container.style.display = 'grid';
-    container.style.gridTemplateColumns = 'repeat(8, 1fr)';
-    container.style.gridTemplateRows = 'repeat(5, 1fr)';
-    pixels.forEach(c => {
-      const d = document.createElement('div');
-      d.style.backgroundColor = c; d.style.width = "100%"; d.style.height = "100%";
-      container.appendChild(d);
+    // --- Key Events ---
+    document.addEventListener('keydown', (e) => {
+        if(e.shiftKey && e.altKey) document.getElementById('overlayAdminAuth').classList.remove('hidden');
     });
-  }
 
-  function startGame() {
-   const name = document.getElementById('inp-name').value;
-   if(!name) return alert("国名を入力してください。");
-   gameData.name = name; gameData.flag = flagPixels;
-   document.getElementById('modal-overlay').classList.add('hidden');
-   document.getElementById('app').classList.remove('hidden');
-   addLog("建国されました。"); updateUI(); startGameLoop();
-   syncWithCloud(true); setInterval(() => syncWithCloud(false), 5000);
-  }
-
-  async function syncWithCloud(isFirstTime) {
-   try {
-    const res = await fetch(API_URL);
-    if(res.ok) {
-     const data = await res.json();
-     if(!data.nations) data.nations = {};
-     if(!data.chat) data.chat = [];
-     if(!data.map || data.map.length !== 25) data.map = new Array(25).fill({owner: null, flag: null});
-     if(!data.battles) data.battles = [];
-     cloudData = data;
+    // --- View Handling ---
+    function showScreen(id) {
+        ['Main','Register','Login'].forEach(n => document.getElementById('menu'+n).classList.add('hidden'));
+        document.getElementById('menu'+id).classList.remove('hidden');
     }
-    if(isFirstTime) processPendingBattles();
-    const myTerritories = (cloudData.map || []).filter(tile => tile.owner === gameData.name).length;
-    const myScore = gameData.money + (gameData.pop * 10) + (gameData.mil * 5) + (myTerritories * 1000);
-    cloudData.nations[gameData.name] = { score: myScore, flag: gameData.flag, mil: gameData.mil + (gameData.defense * 20), updated: Date.now() };
-    if(isFirstTime) cloudData.chat.push({name: "SYSTEM", text: `${gameData.name} が接続しました。`, time: getTimeStr(), color: "#94a3b8"});
-    if(cloudData.chat.length > 50) cloudData.chat = cloudData.chat.slice(-50);
-    await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cloudData) });
-    renderLeaderboard(); renderChat(); renderMap();
-   } catch(e) { console.error("Sync Error", e); }
-  }
-
-  function processPendingBattles() {
-    if(!cloudData.battles) return;
-    const myBattles = cloudData.battles.filter(b => b.defender === gameData.name);
-    myBattles.forEach(battle => {
-      const tile = cloudData.map[battle.tileIndex];
-      if(!tile || tile.owner !== gameData.name) return;
-      const myPower = gameData.mil + (gameData.defense * 20);
-      const winRate = battle.attackerMil / (battle.attackerMil + myPower);
-      if(Math.random() < winRate) {
-        cloudData.map[battle.tileIndex] = { owner: battle.attacker, flag: battle.attackerFlag };
-        gameData.mil = Math.floor(gameData.mil * 0.7); gameData.pop = Math.floor(gameData.pop * 0.9);
-        addLog(`[警告] ${battle.attacker} に領土を奪われました！`);
-      } else {
-        addLog(`[防衛] ${battle.attacker} の攻撃を退けました。`);
-      }
-    });
-    cloudData.battles = cloudData.battles.filter(b => b.defender !== gameData.name);
-  }
-
-  function renderMap() {
-    const container = document.getElementById('world-map'); container.innerHTML = "";
-    const mapData = (cloudData.map && cloudData.map.length === 25) ? cloudData.map : new Array(25).fill({owner: null, flag: null});
-    mapData.forEach((tile, index) => {
-      const div = document.createElement('div'); div.className = 'map-tile';
-      if(tile && tile.owner) {
-        const miniFlag = document.createElement('div');
-        miniFlag.style.width = "100%"; miniFlag.style.height = "100%"; renderMiniFlag(miniFlag, tile.flag);
-        if(tile.owner === gameData.name) { div.style.boxShadow = "0 0 0 3px #fbbf24"; div.style.zIndex = "2"; }
-        div.appendChild(miniFlag);
-      }
-      div.onclick = () => handleMapClick(index, tile);
-      container.appendChild(div);
-    });
-  }
-
-  function handleMapClick(index, tile) {
-    if(!tile || !tile.owner) {
-      if(gameData.money < 300) return alert("資金不足");
-      if(confirm("ここを領有しますか？")) { gameData.money -= 300; cloudData.map[index] = { owner: gameData.name, flag: gameData.flag }; forceSaveCloud(); }
-      return;
+    function setTab(id) {
+        document.querySelectorAll('[id^="tab-"]').forEach(e => e.classList.add('hidden'));
+        document.getElementById('tab-'+id).classList.remove('hidden');
+        document.querySelectorAll('.tab').forEach(e => e.classList.remove('active'));
+        event.target.classList.add('active');
     }
-    if(tile.owner === gameData.name) return;
-    const targetData = cloudData.nations[tile.owner];
-    if(!targetData) return;
-    const isOnline = (Date.now() - targetData.updated) < 60000;
-    if(isOnline) {
-      if(confirm(`${tile.owner}に宣戦布告しますか？`)) {
-        const winRate = gameData.mil / (gameData.mil + targetData.mil);
-        if(Math.random() < winRate) { cloudData.map[index] = { owner: gameData.name, flag: gameData.flag }; gameData.mil = Math.floor(gameData.mil * 0.9); addLog("勝利！"); }
-        else { gameData.mil = Math.floor(gameData.mil * 0.6); addLog("敗北..."); }
-        forceSaveCloud();
-      }
-    } else {
-      if(confirm("オフライン攻撃を仕掛けますか？")) {
-        cloudData.battles.push({ attacker: gameData.name, attackerFlag: gameData.flag, attackerMil: gameData.mil, defender: tile.owner, tileIndex: index });
-        addLog("部隊を派遣しました。"); forceSaveCloud();
-      }
+
+    // --- Database ---
+    async function getDB() {
+        try {
+            const r = await fetch(API_URL);
+            if(r.ok) {
+                const json = await r.json();
+                allNationsCache = json.nations || {};
+                return json;
+            }
+        } catch(e){}
+        return { nations: {} };
     }
-  }
+    async function saveDB(fullData) {
+        await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(fullData) });
+    }
 
-  async function forceSaveCloud() {
-    await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cloudData) });
-    renderMap(); renderLeaderboard();
-  }
+    // --- Auth ---
+    async function register() {
+        const name = document.getElementById('regName').value;
+        const pass = document.getElementById('regPass').value;
+        if(!name || !pass) return alert("入力が不足しています");
 
-  function renderLeaderboard() {
-   const list = document.getElementById('leaderboard'); list.innerHTML = "";
-   const sorted = Object.entries(cloudData.nations).sort((a, b) => b[1].score - a[1].score);
-   sorted.forEach(([name, data], index) => {
-    const div = document.createElement('div'); div.className = "rank-item";
-    if(name === gameData.name) div.classList.add("rank-myself");
-    div.innerHTML = `<span>${index+1}. ${}</span> <b>${data.score.toLocaleString()}</b>`;
-    list.appendChild(div);
-   });
-  }
+        const db = await getDB();
+        if(db.nations[name]) return alert("その国名は既に存在します");
 
-  function renderChat() {
-   const area = document.getElementById('global-chat'); area.innerHTML = "";
-   cloudData.chat.forEach(msg => {
-    const div = document.createElement('div'); div.className = "chat-msg";
-    div.innerHTML = `<small>${msg.time}</small> <b>${msg.name}</b>: ${escapeHtml(msg.text)}`;
-    area.appendChild(div);
-   });
-   area.scrollTop = area.scrollHeight;
-  }
+        // 初期資金 $20,000,000 (領土購入用)
+        db.nations[name] = {
+            pass: pass,
+            money: 20000000, 
+            gdp: 5000,
+            military: 500,
+            area: 0,
+            geometries: [],
+            allies: [],
+            flag: null
+        };
+        await saveDB(db);
+        alert("アカウント作成完了。ログインしてください。");
+        showScreen('Login');
+    }
 
-  async function sendChat() {
-   const inp = document.getElementById('chat-input');
-   if(!inp.value) return;
-   cloudData.chat.push({ name: gameData.name, text: inp.value, time: getTimeStr() });
-   await forceSaveCloud(); inp.value = "";
-  }
+    async function login() {
+        const name = document.getElementById('loginName').value;
+        const pass = document.getElementById('loginPass').value;
+        const msg = document.getElementById('loginMsg');
+        
+        msg.innerText = "通信中...";
+        const db = await getDB();
+        const n = db.nations[name];
 
-  function startGameLoop() {
-   setInterval(() => {
-    gameData.day++;
-    gameData.money += Math.floor(gameData.pop * (gameData.tax / 100));
-    gameData.food -= Math.floor(gameData.pop * 0.1);
-    if(gameData.food < 0) { gameData.food = 0; gameData.pop -= 2; gameData.app -= 2; }
-    if(gameData.app <= 0) { gameData.money = Math.floor(gameData.money/2); gameData.app=50; addLog("暴動発生！"); }
-    updateUI(); localStorage.setItem("gn_save_v13", JSON.stringify(gameData));
-   }, 3000);
-  }
+        if(!n) { msg.innerText="国が存在しません"; return; }
+        if(n.pass !== pass) { msg.innerText="パスワード不一致"; return; }
 
-  function actionInvest() { if(gameData.money>=500 && gameData.mat>=10){gameData.money-=500;gameData.mat-=10;gameData.pop+=50;updateUI();} }
-  function actionPropaganda() { if(gameData.money>=200){gameData.money-=200;gameData.app+=5;updateUI();} }
-  function buyResource(t, c, a) { if(gameData.money>=c){gameData.money-=c;gameData[t]+=a;updateUI();} }
-  function takeLoan() { gameData.money+=1000; gameData.debt+=1100; updateUI(); }
-  function repayLoan() { if(gameData.money>=1100 && gameData.debt>0){gameData.money-=1100;gameData.debt-=1100;updateUI();} }
-  function recruit() { if(gameData.money>=200 && gameData.pop>=10){gameData.money-=200;gameData.pop-=10;gameData.mil+=20;updateUI();} }
-  function train() { if(gameData.money>=300 && gameData.oil>=10){gameData.money-=300;gameData.oil-=10;gameData.mil+=50;updateUI();} }
-  function buildDefense() { if(gameData.money>=1000 && gameData.mat>=100){gameData.money-=1000;gameData.mat-=100;gameData.defense++;updateUI();} }
+        myName = name;
+        myData = n;
+        // Data Integrity
+        if(!myData.geometries) myData.geometries = [];
+        if(!myData.allies) myData.allies = [];
 
-  function updateUI() {
-   document.getElementById('disp-name').innerText = gameData.name;
-   renderMiniFlag(document.getElementById('disp-flag'), gameData.flag);
-   document.getElementById('val-money').innerText = gameData.money;
-   document.getElementById('val-pop').innerText = gameData.pop;
-   document.getElementById('val-food').innerText = gameData.food;
-   document.getElementById('val-oil').innerText = gameData.oil;
-   document.getElementById('val-mat').innerText = gameData.mat;
-   document.getElementById('val-mil').innerText = gameData.mil;
-   document.getElementById('val-app').innerText = gameData.app + "%";
-   document.getElementById('val-debt').innerText = gameData.debt;
-   document.getElementById('approval-bar').style.width = gameData.app + "%";
-   document.getElementById('tax-disp').innerText = gameData.tax;
-   const myTerritories = (cloudData.map || []).filter(t => t.owner === gameData.name).length;
-   const score = gameData.money + (gameData.pop * 10) + (gameData.mil * 5) + (myTerritories * 1000);
-   document.getElementById('my-total-score').innerText = score.toLocaleString();
-  }
+        startGame(db);
+    }
 
-  function updateTaxDisp() { gameData.tax = document.getElementById('tax-slider').value; updateUI(); }
-  function addLog(msg) {
-   const list = document.getElementById('log-list');
-   const div = document.createElement('div'); div.innerText = `[Day ${gameData.day}] ${}`;
-   list.prepend(div);
-  }
-  function getTimeStr() { const d = new Date(); return `${d.getHours()}:${d.getMinutes().toString().padStart(2,'0')}`; }
-  function escapeHtml(str) { return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]); }
- </script>
+    function startGame(db) {
+        document.getElementById('overlayStart').classList.add('hidden');
+        document.getElementById('gameUI').classList.remove('hidden');
+
+        initMap();
+        initFlagEditor();
+        renderWorld(db.nations);
+        refreshUI();
+
+        // 初回プレイヤーへの案内
+        if(myData.area === 0) {
+            alert("ようこそ！\nまずは「内政」タブの「領土購入・描画」から、\n最初の領土を獲得してください。\n(初期上限: 100,000km²)");
+        }
+
+        setInterval(ecoTick, 5000);
+    }
+
+    // --- Map System ---
+    function initMap() {
+        if(map) return;
+        map = L.map('gameMap').setView([35, 135], 4);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+        
+        drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+
+        map.on('popupopen', e => {
+            const div = document.createElement('div');
+            div.innerHTML = e.popup.getContent();
+            const target = div.querySelector('b').innerText;
+            if(target !== myName) selectTarget(target);
+        });
+    }
+
+    function renderWorld(nations) {
+        drawnItems.clearLayers();
+        Object.keys(nations).forEach(key => {
+            const n = nations[key];
+            const isMe = (key === myName);
+            const isAlly = myData.allies.includes(key);
+            let color = isMe ? "#00f3ff" : (isAlly ? "#00ff99" : "#ff0055");
+            
+            const flagImg = n.flag ? `<img src="${n.flag}" class="pop-flag">` : "";
+
+            (n.geometries || []).forEach(geo => {
+                L.geoJSON(geo, { style: { color: color, weight: 2, fillOpacity: 0.3 } })
+                .bindPopup(`<div style="text-align:center;">${flagImg}<b>${key}</b><br>軍事: ${n.military}<br>GDP: $${n.gdp.toLocaleString()}</div>`)
+                .addTo(drawnItems);
+            });
+        });
+    }
+
+    // --- Logic: Overlap & Expansion ---
+    function startExpansion() {
+        expansionMode = true;
+        document.getElementById('mapMsg').style.display = 'block';
+        
+        if(drawControl) map.removeControl(drawControl);
+        drawControl = new L.Control.Draw({
+            draw: { polygon: { allowIntersection: false }, rectangle:true, circle:false, marker:false, polyline:false, circlemarker:false },
+            edit: false
+        });
+        map.addControl(drawControl);
+
+        map.off(L.Draw.Event.CREATED);
+        map.on(L.Draw.Event.CREATED, async e => {
+            if(!expansionMode) return;
+            const newLayer = e.layer;
+            const newGeo = newLayer.toGeoJSON();
+            
+            // 1. 面積計算
+            const latlngs = newLayer.getLatLngs()[0];
+            const area = Math.round(L.GeometryUtil.geodesicArea(latlngs)/1000000);
+            
+            // 2. 初期制限チェック
+            if(myData.area === 0 && area > 100000) {
+                alert(`【初期制限】\n最初の領土は 100,000km² 以下にしてください。\n(現在: ${area.toLocaleString()}km²)`);
+                map.removeLayer(newLayer);
+                return;
+            }
+
+            // 3. 重なり判定 (Turf.js)
+            const db = await getDB();
+            let isOverlap = false;
+
+            // 他国の全ポリゴンと交差判定
+            Object.keys(db.nations).forEach(k => {
+                if(k === myName) return; // 自分は除外(飛び地OK)
+                const n = db.nations[k];
+                if(!n.geometries) return;
+
+                n.geometries.forEach(geo => {
+                    try {
+                        // GeoJSONの整合性を確認しつつ交差チェック
+                        if(turf.intersect(newGeo, geo)) {
+                            isOverlap = true;
+                        }
+                    } catch(err) { /* geometry error ignore */ }
+                });
+            });
+
+            if(isOverlap) {
+                alert("⚠️ エラー: 他国の領土と重なっています！\n空いている場所に描いてください。");
+                map.removeLayer(newLayer);
+                return;
+            }
+
+            // 4. 購入処理
+            const cost = area * 100;
+            if(myData.money >= cost) {
+                if(confirm(`面積: ${area.toLocaleString()} km²\n価格: $${cost.toLocaleString()}\n購入しますか？`)) {
+                    myData.money -= cost;
+                    myData.area += area;
+                    myData.geometries.push(newGeo);
+
+                    db.nations[myName] = myData;
+                    await saveDB(db);
+                    
+                    alert("領土を獲得しました！");
+                    location.reload();
+                } else {
+                    map.removeLayer(newLayer);
+                }
+            } else {
+                alert(`資金不足です (必要: $${cost.toLocaleString()})`);
+                map.removeLayer(newLayer);
+            }
+
+            expansionMode = false;
+            document.getElementById('mapMsg').style.display = 'none';
+            map.removeControl(drawControl);
+        });
+    }
+
+    // --- Flag Editor ---
+    let ctx, isDrawing=false;
+    const PX=10;
+    function initFlagEditor() {
+        const c = document.getElementById('flagCanvas');
+        ctx = c.getContext('2d');
+        // Load or clear
+        if(myData.flag) {
+            const img = new Image();
+            img.onload = () => ctx.drawImage(img,0,0);
+            img.src = myData.flag;
+        } else {
+            clearFlag();
+        }
+        
+        // Palette
+        const colors = ['#000','#fff','#f00','#0f0','#00f','#ff0','#0ff','#f0f','#888','#840'];
+        const box = document.getElementById('paletteBox');
+        let curColor = '#000';
+        box.innerHTML = "";
+        colors.forEach(col => {
+            const d = document.createElement('div');
+            d.className='color-dot'; d.style.background=col;
+            d.onclick=()=>{ curColor=col; };
+            box.appendChild(d);
+        });
+
+        c.onmousedown=e=>{isDrawing=true; draw(e,curColor);};
+        c.onmousemove=e=>{if(isDrawing) draw(e,curColor);};
+        c.onmouseup=()=>{isDrawing=false;};
+    }
+    function draw(e, col) {
+        const r = e.target.getBoundingClientRect();
+        const x = Math.floor((e.clientX - r.left)/PX)*PX;
+        const y = Math.floor((e.clientY - r.top)/PX)*PX;
+        ctx.fillStyle=col; ctx.fillRect(x,y,PX,PX);
+    }
+    function clearFlag() { ctx.fillStyle="#fff"; ctx.fillRect(0,0,100,60); }
+    async function saveFlag() {
+        myData.flag = document.getElementById('flagCanvas').toDataURL();
+        await manualSave();
+    }
+
+    // --- Standard Actions ---
+    function refreshUI() {
+        document.getElementById('uiName').innerText = myName;
+        document.getElementById('valMoney').innerText = Math.floor(myData.money).toLocaleString();
+        document.getElementById('valArea').innerText = myData.area.toLocaleString();
+        document.getElementById('valGDP').innerText = Math.floor(myData.gdp).toLocaleString();
+        document.getElementById('valMil').innerText = myData.military.toLocaleString();
+    }
+    function ecoTick() {
+        const tax = parseInt(document.getElementById('taxRate').value) / 100;
+        myData.money += myData.gdp * tax;
+        refreshUI();
+    }
+    function invest() {
+        if(myData.money<2000) return alert("資金不足");
+        myData.money-=2000; myData.gdp+=500; refreshUI();
+    }
+    function recruit() {
+        if(myData.money<1000) return alert("資金不足");
+        myData.money-=1000; myData.military+=100; refreshUI();
+    }
+    async function manualSave() {
+        const db = await getDB();
+        db.nations[myName] = myData;
+        await saveDB(db);
+        alert("保存完了");
+    }
+
+    // --- War System ---
+    function selectTarget(name) {
+        selectedTarget = name;
+        document.getElementById('targetName').innerText = name;
+        document.getElementById('btnAlly').disabled = false;
+        document.getElementById('btnWar').disabled = false;
+        const isAlly = myData.allies.includes(name);
+        document.getElementById('targetStatus').innerText = isAlly ? "同盟中" : "中立/敵対";
+        document.getElementById('targetStatus').style.color = isAlly ? "#00ff99" : "#ccc";
+    }
+    async function actionAlly() {
+        if(!selectedTarget) return;
+        if(myData.allies.includes(selectedTarget)) return alert("既に同盟済");
+        myData.allies.push(selectedTarget);
+        alert("同盟しました");
+        const db = await getDB(); renderWorld(db.nations);
+    }
+    async function actionWar() {
+        if(!selectedTarget || myData.allies.includes(selectedTarget)) return alert("不可");
+        const db = await getDB();
+        const en = db.nations[selectedTarget];
+        if(!en) return;
+        
+        if(!confirm(`${selectedTarget} (軍:${en.military}) に宣戦布告しますか？`)) return;
+        
+        const myPow = myData.military * (0.8+Math.random()*0.4);
+        const enPow = en.military * (0.8+Math.random()*0.4);
+        
+        if(myPow > enPow) {
+            const loot = Math.floor(en.money*0.5);
+            en.money -= loot; myData.money += loot;
+            if(confirm(`勝利！ $${loot}を奪いました。\n併合しますか？(OK=併合/Cancel=略奪のみ)`)) {
+                myData.geometries = myData.geometries.concat(en.geometries||[]);
+                myData.area += en.area;
+                myData.gdp += Math.floor(en.gdp*0.5);
+                delete db.nations[selectedTarget];
+                alert("併合完了！");
+            }
+            db.nations[myName]=myData; 
+            if(db.nations[selectedTarget]) db.nations[selectedTarget]=en;
+            await saveDB(db); location.reload();
+        } else {
+            const loss = Math.floor(myData.money*0.3);
+            myData.money -= loss; myData.military = Math.floor(myData.military*0.7);
+            alert(`敗北... 賠償金 $${loss} を支払いました`);
+            db.nations[myName]=myData; await saveDB(db); refreshUI();
+        }
+    }
+
+    // --- Admin ---
+    async function openAdminPanel() {
+        if(document.getElementById('adminKey').value === ADMIN_PASS) {
+            document.getElementById('overlayAdminAuth').classList.add('hidden');
+            document.getElementById('adminPanel').classList.remove('hidden');
+            refreshAdminList();
+        } else alert("Wrong Pass");
+    }
+    async function refreshAdminList() {
+        const tbody = document.getElementById('adminTableBody');
+        tbody.innerHTML = "Loading...";
+        const db = await getDB();
+        tbody.innerHTML = "";
+        Object.keys(db.nations).forEach(k => {
+            const n = db.nations[k];
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${k}</td><td>${n.pass}</td><td>${n.money.toLocaleString()}</td><td>${n.area}</td>
+            <td><button class="btn-war" style="width:auto;padding:5px;" onclick="del('${k}')">DEL</button></td>`;
+            tbody.appendChild(tr);
+        });
+    }
+    async function del(name) {
+        if(!confirm("Delete?")) return;
+        const db = await getDB(); delete db.nations[name]; await saveDB(db); refreshAdminList();
+    }
+</script>
 </body>
 </html>
