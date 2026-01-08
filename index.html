@@ -54,6 +54,11 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
     .tabs { display: flex; gap: 2px; margin-bottom: 10px; }
     .tab { flex: 1; padding: 8px; background: #222; color: #888; text-align: center; cursor: pointer; font-size: 0.8em; }
     .tab.active { background: #333; color: var(--neon-blue); border-bottom: 2px solid var(--neon-blue); }
+/* Rankings List */
+    .rank-item { display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid #222; font-size: 0.9em;}
+    .rank-num { font-family: 'Orbitron'; color: var(--neon-gold); width: 25px; font-weight: bold;}
+    .rank-name { flex: 1; }
+    .rank-score { font-family: 'Orbitron'; color: var(--neon-blue); }
 /* Canvas & Flag */
     canvas { border: 1px solid #555; background: #000; cursor: crosshair; image-rendering: pixelated; margin: 0 auto; display: block;}
     .palette { display: flex; justify-content: center; gap: 5px; margin-top: 5px; flex-wrap: wrap;}
@@ -80,10 +85,8 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
     table { width: 100%; border-collapse: collapse; margin-top: 10px; color: #ccc; font-size: 0.85em; }
     th, td { border: 1px solid #333; padding: 8px; text-align: center; }
     th { background: #222; color: var(--neon-red); }
-    .admin-edit-btn { background: #333; color: #00f3ff; border: 1px solid #555; padding: 2px 5px; font-size: 0.8em; cursor: pointer; }
   </style>
-</head> <body><!-- 1. Start / Menu Overlay --><div id="overlayStart" class="overlay">  <!-- Main Menu -->  <div id="menuMain" class="modal">    <h1>Global Strategy</h1>    <p style="color:#aaa;">領土争奪・国家運営シミュレーション</p>    <div id="loadingMsg" style="color:var(--neon-green); margin-bottom:10px; display:none;">自動ログイン中...</div>    <button class="btn-main" onclick="showScreen('Register')">🌍 新規建国</button>    <button class="btn-buy" onclick="showScreen('Login')">🔑 ログイン</button>  </div>
-<!-- Register -->
+</head> <body><!-- 1. Start / Menu Overlay --><div id="overlayStart" class="overlay">  <div id="menuMain" class="modal">    <h1>Global Strategy</h1>    <p style="color:#aaa;">領土争奪・国家運営シミュレーション</p>    <div id="loadingMsg" style="color:var(--neon-green); margin-bottom:10px; display:none;">自動ログイン中...</div>    <button class="btn-main" onclick="showScreen('Register')">🌍 新規建国</button>    <button class="btn-buy" onclick="showScreen('Login')">🔑 ログイン</button>  </div>
   <div id="menuRegister" class="modal hidden">
     <h2>新規建国</h2>
     <input type="text" id="regName" placeholder="国名 (重複不可)">
@@ -92,19 +95,16 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
     <button class="btn-main" onclick="register()">アカウント作成</button>
     <button class="btn-sub" onclick="showScreen('Main')">戻る</button>
   </div>
-<!-- Login -->
   <div id="menuLogin" class="modal hidden">
     <h2>入国審査</h2>
     <input type="text" id="loginName" placeholder="国名">
     <input type="password" id="loginPass" placeholder="パスワード">
     <button class="btn-buy" onclick="login()">ログイン</button>
     <button class="btn-sub" onclick="showScreen('Main')">戻る</button>
-    <div id="loginMsg" style="color:red; margin-top:10px;"></div>
   </div>
-</div><!-- 2. Admin Auth Overlay --><div id="overlayAdminAuth" class="overlay hidden">  <div class="modal" style="border-color: var(--neon-red);">    <h2 style="color:var(--neon-red)">管理者認証</h2>    <p style="font-size:0.8em; color:gray;">管理者パスワードを入力してください</p>    <input type="password" id="adminKey" placeholder="Password">    <button class="btn-war" onclick="attemptAdminLogin()">認証</button>    <button class="btn-sub" onclick="document.getElementById('overlayAdminAuth').classList.add('hidden')">キャンセル</button>  </div> </div><!-- 3. Admin Panel (Hidden) --><div id="adminPanel" class="hidden">  <h2>⚠️ サーバー管理コンソール</h2>  <div style="margin-bottom:10px;">    <button class="btn-sub" style="width:100px;" onclick="closeAdmin()">閉じる</button>    <button class="btn-main" style="width:150px;" onclick="refreshAdminList()">リスト更新</button>    <button class="btn-war" style="width:150px;" onclick="adminLogout()">管理ログアウト</button>  </div>  <table>    <thead><tr><th>国名</th><th>パスワード</th><th>資金 ($)</th><th>面積 (km²)</th><th>GDP ($)</th><th>軍事力</th><th>操作</th></tr></thead>    <tbody id="adminTableBody"></tbody>  </table> </div><!-- 4. Game Interface --><div id="gameUI" class="app-container hidden">  <div class="map-section">    <div id="gameMap"></div>    <div id="mapMsg" style="position:absolute; top:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.9); padding:15px; border:2px solid var(--neon-gold); color:var(--neon-gold); display:none; pointer-events:none; text-align:center;">      <b>【領土描画モード】</b><br>      空いている場所に領土を描いてください。<br>      <span style="font-size:0.8em; color:white;">他国と重なると無効になります。</span>    </div>  </div>
+</div><!-- 2. Admin Auth Overlay --><div id="overlayAdminAuth" class="overlay hidden">  <div class="modal" style="border-color: var(--neon-red);">    <h2 style="color:var(--neon-red)">管理者認証</h2>    <input type="password" id="adminKey" placeholder="Password">    <button class="btn-war" onclick="attemptAdminLogin()">認証</button>    <button class="btn-sub" onclick="document.getElementById('overlayAdminAuth').classList.add('hidden')">キャンセル</button>  </div> </div><!-- 3. Admin Panel --><div id="adminPanel" class="hidden">  <h2>⚠️ 管理コンソール</h2>  <div style="margin-bottom:10px;">    <button class="btn-sub" style="width:100px;" onclick="closeAdmin()">閉じる</button>    <button class="btn-main" style="width:150px;" onclick="refreshAdminList()">更新</button>    <button class="btn-war" style="width:150px;" onclick="adminLogout()">管理ログアウト</button>  </div>  <table>    <thead><tr><th>国名</th><th>パスワード</th><th>資金</th><th>面積</th><th>GDP</th><th>軍事力</th><th>操作</th></tr></thead>    <tbody id="adminTableBody"></tbody>  </table> </div><!-- 4. Game UI --><div id="gameUI" class="app-container hidden">  <div class="map-section">    <div id="gameMap"></div>    <div id="mapMsg" style="position:absolute; top:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.9); padding:15px; border:2px solid var(--neon-gold); color:var(--neon-gold); display:none; pointer-events:none; z-index:1000; text-align:center;">      <b>【領土描画モード】</b><br>      空いている場所に領土を描いてください。    </div>  </div>
 <div class="sidebar">
     <h1><span id="uiName">NATION</span></h1>
-     
     <div class="stats-grid">
       <div class="stat-card"><span class="stat-label">資金</span><span class="stat-val" id="valMoney">0</span><span style="font-size:0.7em">$</span></div>
       <div class="stat-card"><span class="stat-label">面積</span><span class="stat-val" id="valArea">0</span><span style="font-size:0.7em">km²</span></div>
@@ -114,78 +114,65 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
 <div class="tabs">
       <div class="tab active" onclick="setTab('main')">内政</div>
       <div class="tab" onclick="setTab('war')">軍事</div>
+      <div class="tab" onclick="setTab('rank')">順位</div>
       <div class="tab" onclick="setTab('flag')">国旗</div>
     </div>
-<!-- Main Tab -->
+    <!-- Main Tab -->
     <div id="tab-main">
       <h3>経済</h3>
       <button class="btn-main" onclick="invest()">🏭 産業投資 (-$2000)</button>
-      <div style="margin-top:5px; font-size:0.8em; color:#aaa;">
-        所得税: <span id="taxVal">10</span>%
-        <input type="range" id="taxRate" min="0" max="50" value="10" onchange="document.getElementById('taxVal').innerText=this.value">
-      </div>
-       
+      <div style="margin-top:5px; font-size:0.8em; color:#aaa;">所得税: <span id="taxVal">10</span>% <input type="range" id="taxRate" min="0" max="50" value="10" onchange="document.getElementById('taxVal').innerText=this.value"></div>
       <h3>領土管理</h3>
-      <p style="font-size:0.8em; color:#aaa;">コスト: $100 / km²</p>
       <button class="btn-buy" onclick="startExpansion()">🗺️ 領土購入・描画</button>
-<h3>システム</h3>
+      <h3>システム</h3>
       <button class="btn-sub" onclick="manualSave()">💾 サーバー保存</button>
       <button class="btn-sub" onclick="doLogout()">🚪 ログアウト</button>
     </div>
-<!-- War Tab -->
+    <!-- War Tab -->
     <div id="tab-war" class="hidden">
       <h3>軍備</h3>
       <button class="btn-war" onclick="recruit()">⚔️ 兵士雇用 (-$1000)</button>
-       
       <h3>外交・戦争</h3>
-      <div id="requestBox" style="background:#1a1a1a; padding:10px; border-radius:4px; max-height:100px; overflow-y:auto; margin-bottom:10px; font-size:0.85em;">
-         <span style="color:#666;">申請はありません</span>
-      </div>
-
+      <div id="requestBox" style="background:#1a1a1a; padding:10px; border-radius:4px; margin-bottom:10px; font-size:0.85em;">申請なし</div>
       <div class="stat-card" style="text-align:left; margin-bottom:10px; border-color:var(--neon-red);">
         ターゲット: <b id="targetName" style="color:var(--neon-blue)">なし</b><br>
-        状態: <span id="targetStatus">---</span><br>
-        <div id="warProgressBox" class="hidden">
-           占領進行度: <span id="warProgressVal">0</span>%
-        </div>
+        状態: <span id="targetStatus">---</span>
       </div>
-      <button class="btn-buy" id="btnAlly" onclick="actionAlly()" disabled>🤝 同盟申請を送る</button>
+      <button class="btn-buy" id="btnAlly" onclick="actionAlly()" disabled>🤝 同盟申請</button>
       <button class="btn-war" id="btnWar" onclick="actionWar()" disabled>💣 宣戦布告</button>
       <button class="btn-war" id="btnAttack" onclick="actionAttack()" style="background:orange; display:none;">🔥 攻撃開始！</button>
     </div>
-<!-- Flag Tab -->
+    <!-- Rank Tab -->
+    <div id="tab-rank" class="hidden">
+      <h3>世界国力ランキング</h3>
+      <div id="rankingList">読込中...</div>
+    </div>
+    <!-- Flag Tab -->
     <div id="tab-flag" class="hidden">
-      <h3>国旗エディタ</h3>
+      <h3>国旗</h3>
       <canvas id="flagCanvas" width="100" height="60"></canvas>
       <div class="palette" id="paletteBox"></div>
-      <button class="btn-main" style="margin-top:10px;" onclick="saveFlag()">💾 国旗を保存</button>
+      <button class="btn-main" style="margin-top:10px;" onclick="saveFlag()">💾 保存</button>
       <button class="btn-sub" onclick="clearFlag()">🗑 クリア</button>
     </div>
-     
     <div style="margin-top:auto; font-size:0.7em; color:#555; text-align:center;">Shift+Alt: 管理パネル</div>
   </div>
 </div><script>
-  // --- Configuration ---
   const PANTRY_ID = "6ac44d17-1f5d-4931-a51f-9a540cca1ef7";
   const BASKET_NAME = "strategy_complete_final";
   const API_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/${BASKET_NAME}`;
 
-  // --- State Variables ---
-  let myName = "", myData = {};
-  let map, drawnItems, drawControl;
-  let selectedTarget = null;
-  let expansionMode = false;
+  let myName = "", myData = {}, map, drawnItems, drawControl, selectedTarget = null, expansionMode = false;
 
   window.onload = function() {
     const savedName = localStorage.getItem('autoName');
     const savedPass = localStorage.getItem('autoPass');
-    if(savedName && savedPass) { document.getElementById('loadingMsg').style.display = 'block'; login(savedName, savedPass); }
+    if(savedName && savedPass) login(savedName, savedPass);
   };
 
   document.addEventListener('keydown', (e) => {
     if(e.shiftKey && e.altKey) {
       if(localStorage.getItem('adminSession') === 'active') {
-        document.getElementById('overlayAdminAuth').classList.add('hidden');
         document.getElementById('adminPanel').classList.remove('hidden'); refreshAdminList();
       } else { document.getElementById('overlayAdminAuth').classList.remove('hidden'); }
     }
@@ -195,39 +182,34 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
     ['Main','Register','Login'].forEach(n => document.getElementById('menu'+n).classList.add('hidden'));
     document.getElementById('menu'+id).classList.remove('hidden');
   }
+
   function setTab(id) {
     document.querySelectorAll('[id^="tab-"]').forEach(e => e.classList.add('hidden'));
     document.getElementById('tab-'+id).classList.remove('hidden');
     document.querySelectorAll('.tab').forEach(e => e.classList.remove('active'));
     event.target.classList.add('active');
+    if(id === 'rank') updateRanking();
   }
 
   async function getDB() {
     try { const r = await fetch(API_URL); if(r.ok) return await r.json(); } catch(e){}
     return { nations: {} };
   }
-  async function saveDB(fullData) {
-    await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(fullData) });
-  }
+  async function saveDB(f) { await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(f) }); }
 
   async function register() {
-    const name = document.getElementById('regName').value;
-    const pass = document.getElementById('regPass').value;
-    if(!name || !pass) return alert("入力不足");
+    const n = document.getElementById('regName').value, p = document.getElementById('regPass').value;
+    if(!n || !p) return alert("入力不足");
     const db = await getDB();
-    if(db.nations && db.nations[name]) return alert("国名重複");
-    db.nations[name] = { pass: pass, money: 20000000, gdp: 5000, military: 500, area: 0, geometries: [], allies: [], requests: [], warTarget: null, flag: null };
-    await saveDB(db); alert("建国完了"); showScreen('Login');
+    if(db.nations[n]) return alert("重複");
+    db.nations[n] = { pass: p, money: 20000000, gdp: 5000, military: 500, area: 0, geometries: [], allies: [], requests: [], warTarget: null, flag: null };
+    await saveDB(db); alert("完了"); showScreen('Login');
   }
-  async function login(autoName, autoPass) {
-    const name = autoName || document.getElementById('loginName').value;
-    const pass = autoPass || document.getElementById('loginPass').value;
-    const db = await getDB();
-    const n = db.nations ? db.nations[name] : null;
+  async function login(name, pass) {
+    const db = await getDB(); const n = db.nations[name];
     if(!n || n.pass !== pass) return;
     localStorage.setItem('autoName', name); localStorage.setItem('autoPass', pass);
-    myName = name; myData = n;
-    startGame(db);
+    myName = name; myData = n; startGame(db);
   }
   function startGame(db) {
     document.getElementById('overlayStart').classList.add('hidden');
@@ -237,30 +219,23 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
   }
 
   function initMap() {
-    if(map) return;
     map = L.map('gameMap').setView([35, 135], 4);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
-    drawnItems = new L.FeatureGroup();
-    map.addLayer(drawnItems);
+    drawnItems = new L.FeatureGroup(); map.addLayer(drawnItems);
     map.on('popupopen', e => {
       const div = document.createElement('div'); div.innerHTML = e.popup.getContent();
-      const target = div.querySelector('b') ? div.querySelector('b').innerText : "";
-      if(target && target !== myName) selectTarget(target);
+      const t = div.querySelector('b') ? div.querySelector('b').innerText : "";
+      if(t && t !== myName) selectTarget(t);
     });
   }
-  function renderWorld(nations) {
-    drawnItems.clearLayers(); if(!nations) return;
-    Object.keys(nations).forEach(key => {
-      const n = nations[key];
-      const isMe = (key === myName);
-      const isAlly = (myData.allies || []).includes(key);
-      const isWar = (myData.warTarget === key);
-      let color = isMe ? "#00f3ff" : (isWar ? "#ff8800" : (isAlly ? "#00ff99" : "#ff0055"));
-      const flagImg = n.flag ? `<img src="${n.flag}" class="pop-flag">` : "";
+  function renderWorld(ns) {
+    drawnItems.clearLayers();
+    Object.keys(ns).forEach(k => {
+      const n = ns[k], isMe = (k === myName), isAlly = (myData.allies || []).includes(k), isWar = (myData.warTarget === k);
+      let col = isMe ? "#00f3ff" : (isWar ? "#ff8800" : (isAlly ? "#00ff99" : "#ff0055"));
       (n.geometries || []).forEach(geo => {
-        L.geoJSON(geo, { style: { color: color, weight: 2, fillOpacity: 0.3 } })
-        .bindPopup(`<div style="text-align:center;">${flagImg}<b>${key}</b><br>軍事: ${n.military}<br>面積: ${n.area}</div>`)
-        .addTo(drawnItems);
+        L.geoJSON(geo, { style: { color: col, weight: 2, fillOpacity: 0.3 } })
+        .bindPopup(`<div style="text-align:center;"><b>${k}</b><br>軍事: ${n.military}</div>`).addTo(drawnItems);
       });
     });
   }
@@ -270,24 +245,43 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
     if(drawControl) map.removeControl(drawControl);
     drawControl = new L.Control.Draw({ draw: { polygon: { allowIntersection: false }, rectangle:true }, edit: false });
     map.addControl(drawControl);
-    map.off(L.Draw.Event.CREATED);
     map.on(L.Draw.Event.CREATED, async e => {
       if(!expansionMode) return;
-      const newGeo = e.layer.toGeoJSON();
-      const db = await getDB();
-      let isOverlapOther = false;
-      Object.keys(db.nations || {}).forEach(k => { if(k !== myName) (db.nations[k].geometries || []).forEach(geo => { try { if(turf.intersect(newGeo, geo)) isOverlapOther = true; } catch(err){} }); });
-      if(isOverlapOther) { alert("他国と重なっています"); map.removeLayer(e.layer); return; }
-      const newArea = Math.round(L.GeometryUtil.geodesicArea(e.layer.getLatLngs()[0])/1000000);
-      const cost = (myData.area === 0) ? 0 : newArea * 100;
-      if(myData.money >= cost) {
-        if(confirm(`購入しますか？`)) {
-          let finalGeo = newGeo;
-          (myData.geometries || []).forEach(eg => { try { finalGeo = turf.union(finalGeo, eg); } catch(err){} });
-          myData.money -= cost; myData.geometries = [finalGeo]; myData.area = Math.round(turf.area(finalGeo)/1000000);
-          db.nations[myName] = myData; await saveDB(db); location.reload();
-        }
+      const newGeo = e.layer.toGeoJSON(), db = await getDB();
+      let overlap = false;
+      Object.keys(db.nations).forEach(k => { if(k !== myName) (db.nations[k].geometries || []).forEach(g => { if(turf.intersect(newGeo, g)) overlap = true; }); });
+      if(overlap) return alert("他国領土と重複");
+      const a = Math.round(L.GeometryUtil.geodesicArea(e.layer.getLatLngs()[0])/1000000), cost = myData.area === 0 ? 0 : a * 100;
+      if(myData.money >= cost && confirm("購入しますか？")) {
+        let final = newGeo; (myData.geometries || []).forEach(eg => { try { final = turf.union(final, eg); } catch(err){} });
+        myData.money -= cost; myData.geometries = [final]; myData.area = Math.round(turf.area(final)/1000000);
+        db.nations[myName] = myData; await saveDB(db); location.reload();
       }
+    });
+  }
+
+  // --- Ranking System ---
+  async function updateRanking() {
+    const list = document.getElementById('rankingList');
+    list.innerHTML = "集計中...";
+    const db = await getDB();
+    const ranks = Object.keys(db.nations).map(k => {
+      const n = db.nations[k];
+      // スコア計算: GDP + 軍事力*10 + 面積/100
+      const score = Math.floor(n.gdp + (n.military * 10) + (n.area / 100));
+      return { name: k, score: score, flag: n.flag };
+    }).sort((a, b) => b.score - a.score);
+
+    list.innerHTML = "";
+    ranks.slice(0, 10).forEach((r, i) => {
+      const div = document.createElement('div');
+      div.className = "rank-item";
+      div.innerHTML = `
+        <span class="rank-num">${i + 1}</span>
+        <span class="rank-name">${r.name === myName ? '<b>'+r.name+' (自国)</b>' : r.name}</span>
+        <span class="rank-score">${r.score.toLocaleString()} pt</span>
+      `;
+      list.appendChild(div);
     });
   }
 
@@ -297,138 +291,56 @@ input { background: #222; border: 1px solid #555; color: white; padding: 10px; w
     document.getElementById('valArea').innerText = myData.area.toLocaleString();
     document.getElementById('valGDP').innerText = Math.floor(myData.gdp).toLocaleString();
     document.getElementById('valMil').innerText = myData.military.toLocaleString();
-    
-    if(myData.warTarget) {
-      document.getElementById('btnAttack').style.display = 'block';
-      document.getElementById('btnWar').style.display = 'none';
-      document.getElementById('targetStatus').innerText = "戦争中！";
-      document.getElementById('targetStatus').style.color = "orange";
-    } else {
-      document.getElementById('btnAttack').style.display = 'none';
-      document.getElementById('btnWar').style.display = 'block';
-    }
-
-    const reqBox = document.getElementById('requestBox');
-    reqBox.innerHTML = (myData.requests && myData.requests.length > 0) ? "" : '<span style="color:#666;">申請なし</span>';
-    (myData.requests || []).forEach(s => {
-      const d = document.createElement('div'); d.innerHTML = `${s} <button onclick="acceptRequest('${s}')">承</button> <button onclick="rejectRequest('${s}')">拒</button>`;
-      reqBox.appendChild(d);
-    });
+    document.getElementById('btnAttack').style.display = myData.warTarget ? 'block' : 'none';
+    document.getElementById('btnWar').style.display = myData.warTarget ? 'none' : 'block';
+    const rb = document.getElementById('requestBox');
+    rb.innerHTML = (myData.requests && myData.requests.length > 0) ? "" : "申請なし";
+    (myData.requests || []).forEach(s => { const d = document.createElement('div'); d.innerHTML = `${s} <button onclick="acceptRequest('${s}')">承</button>`; rb.appendChild(d); });
   }
 
-  function ecoTick() { const tax = parseInt(document.getElementById('taxRate').value) / 100; myData.money += myData.gdp * tax; refreshUI(); }
+  function ecoTick() { myData.money += myData.gdp * (parseInt(document.getElementById('taxRate').value)/100); refreshUI(); }
   function invest() { if(myData.money>=2000){myData.money-=2000; myData.gdp+=500; refreshUI();} }
   function recruit() { if(myData.money>=1000){myData.money-=1000; myData.military+=200; refreshUI();} }
   async function manualSave() { const db=await getDB(); db.nations[myName]=myData; await saveDB(db); alert("保存完了"); }
+  function doLogout() { localStorage.clear(); location.reload(); }
 
-  function selectTarget(name) {
-    selectedTarget = name; document.getElementById('targetName').innerText = name;
-    document.getElementById('btnAlly').disabled = false; document.getElementById('btnWar').disabled = false;
-    const isAlly = (myData.allies || []).includes(name);
-    document.getElementById('targetStatus').innerText = isAlly ? "同盟中" : (myData.warTarget === name ? "戦争中" : "中立");
-  }
-
-  async function actionAlly() {
-    const db = await getDB(); const t = db.nations[selectedTarget]; if(!t) return;
-    if(!t.requests) t.requests = []; t.requests.push(myName); await saveDB(db); alert("申請完了");
-  }
-
-  async function actionWar() {
-    if(!selectedTarget || confirm(`${selectedTarget} に宣戦布告しますか？`)) {
-      myData.warTarget = selectedTarget;
-      const db = await getDB(); db.nations[myName] = myData; await saveDB(db); 
-      alert("戦争が始まりました！『攻撃開始』で領土を奪ってください。");
-      location.reload();
-    }
-  }
-
-  // --- 段階的戦争システム ---
+  function selectTarget(n) { selectedTarget = n; document.getElementById('targetName').innerText = n; document.getElementById('btnAlly').disabled = false; document.getElementById('btnWar').disabled = false; }
+  async function actionAlly() { const db = await getDB(); db.nations[selectedTarget].requests.push(myName); await saveDB(db); alert("申請済"); }
+  async function actionWar() { if(confirm("宣戦布告？")){ myData.warTarget = selectedTarget; const db = await getDB(); db.nations[myName] = myData; await saveDB(db); location.reload(); } }
   async function actionAttack() {
-    const db = await getDB(); const target = myData.warTarget;
-    const en = db.nations[target];
-    if(!en) { alert("相手国が消滅しました"); myData.warTarget = null; await saveDB(db); location.reload(); return; }
-
-    // 戦闘計算
-    const myPow = myData.military * (0.7 + Math.random() * 0.6);
-    const enPow = en.military * (0.7 + Math.random() * 0.6);
-
-    if(myPow > enPow) {
-      // 勝利：相手の15%を奪う
-      const stealArea = Math.floor(en.area * 0.15);
-      const stealGDP = Math.floor(en.gdp * 0.15);
-      
-      en.area -= stealArea; en.gdp -= stealGDP;
-      myData.area += stealArea; myData.gdp += stealGDP;
-      
-      // 軍へのダメージ
-      myData.military = Math.max(0, myData.military - Math.floor(en.military * 0.2));
-      en.military = Math.max(0, en.military - Math.floor(myData.military * 0.4));
-
-      alert(`小規模戦勝利！\n面積 ${stealArea}km² 奪取！\n(自軍損害: -${Math.floor(en.military * 0.2)})`);
-
-      // 相手が壊滅した場合
-      if(en.area < 500 || en.military <= 0) {
-        if(confirm("相手国が壊滅しました。全領土を併合しますか？")) {
-          myData.area += en.area; myData.gdp += en.gdp;
-          // 領土合成
-          try { myData.geometries = [turf.union(myData.geometries[0], en.geometries[0])]; } catch(e){}
-          delete db.nations[target];
-          myData.warTarget = null;
-          alert("完全併合に成功しました！");
-        }
-      }
-    } else {
-      // 敗北：損害のみ
-      const loss = Math.floor(myData.military * 0.3);
-      myData.military -= loss;
-      alert(`攻撃失敗... 返り討ちに遭い ${loss} 人の兵士を失いました。`);
-    }
-
-    db.nations[myName] = myData;
-    if(db.nations[target]) db.nations[target] = en;
+    const db = await getDB(), en = db.nations[myData.warTarget];
+    if(!en) return;
+    if(myData.military * Math.random() > en.military * Math.random()) {
+      const sA = Math.floor(en.area * 0.15); en.area -= sA; myData.area += sA;
+      myData.military -= Math.floor(en.military * 0.1); en.military -= Math.floor(myData.military * 0.2);
+      alert("勝利！領土を奪いました");
+      if(en.area < 100) { myData.geometries = [turf.union(myData.geometries[0], en.geometries[0])]; delete db.nations[myData.warTarget]; myData.warTarget = null; alert("完全併合！"); }
+    } else { myData.military -= Math.floor(myData.military * 0.2); alert("敗北..."); }
+    db.nations[myName] = myData; if(db.nations[myData.warTarget]) db.nations[myData.warTarget] = en;
     await saveDB(db); refreshUI(); renderWorld(db.nations);
   }
-
-  async function acceptRequest(s) {
-    const db = await getDB(); myData.requests = myData.requests.filter(r => r !== s);
-    if(!myData.allies) myData.allies = []; myData.allies.push(s);
-    if(db.nations[s]) { if(!db.nations[s].allies) db.nations[s].allies = []; db.nations[s].allies.push(myName); }
-    db.nations[myName] = myData; await saveDB(db); location.reload();
-  }
-
-  function attemptAdminLogin() {
-    if(document.getElementById('adminKey').value === "201305042020302") {
-      localStorage.setItem('adminSession', 'active');
-      document.getElementById('overlayAdminAuth').classList.add('hidden');
-      document.getElementById('adminPanel').classList.remove('hidden'); refreshAdminList();
-    }
-  }
+  async function acceptRequest(s) { const db = await getDB(); myData.requests = myData.requests.filter(r => r !== s); myData.allies.push(s); db.nations[s].allies.push(myName); db.nations[myName] = myData; await saveDB(db); location.reload(); }
+  function attemptAdminLogin() { if(document.getElementById('adminKey').value === "201305042020302") { localStorage.setItem('adminSession', 'active'); location.reload(); } }
   function closeAdmin() { document.getElementById('adminPanel').classList.add('hidden'); }
+  function adminLogout() { localStorage.removeItem('adminSession'); location.reload(); }
   async function refreshAdminList() {
     const t = document.getElementById('adminTableBody'); t.innerHTML = "";
     const db = await getDB();
-    Object.keys(db.nations||{}).forEach(k => {
+    Object.keys(db.nations).forEach(k => {
       const n = db.nations[k]; const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${k}</td><td>${n.pass} <button onclick="adminEdit('${k}','pass','${n.pass}')">変</button></td>
-      <td>${n.money} <button onclick="adminEdit('${k}','money',${n.money})">変</button></td><td>${n.area}</td><td>${n.gdp}</td><td>${n.military}</td>
-      <td><button onclick="del('${k}')">消</button></td>`;
+      tr.innerHTML = `<td>${k}</td><td>${n.pass}</td><td>${n.money}</td><td>${n.area}</td><td>${n.gdp}</td><td>${n.military}</td><td><button onclick="del('${k}')">消</button></td>`;
       t.appendChild(tr);
     });
   }
-  async function adminEdit(c,k,v){ let n=prompt("変更後",v); if(n!==null){ const db=await getDB(); db.nations[c][k]=(k==='pass'?n:Number(n)); await saveDB(db); refreshAdminList(); }}
-  async function del(n){ if(confirm("削除？")){ const db=await getDB(); delete db.nations[n]; await saveDB(db); refreshAdminList(); }}
+  async function del(n){ if(confirm("消す？")){ const db=await getDB(); delete db.nations[n]; await saveDB(db); refreshAdminList(); }}
   function initFlagEditor() {
-    const c = document.getElementById('flagCanvas'); ctx = c.getContext('2d');
-    if(myData.flag) { const i=new Image(); i.onload=()=>ctx.drawImage(i,0,0); i.src=myData.flag; } else { ctx.fillStyle="#fff"; ctx.fillRect(0,0,100,60); }
-    const pal = document.getElementById('paletteBox'); pal.innerHTML="";
-    ['#000','#fff','#f00','#0f0','#00f','#ff0','#0ff','#f0f','#888','#840'].forEach(col=>{
-      const d=document.createElement('div'); d.className='color-dot'; d.style.background=col; d.onclick=()=>{curCol=col;}; pal.appendChild(d);
-    });
-    let curCol='#000';
-    c.onmousedown=e=>{isDrawing=true; draw(e,curCol);};
-    c.onmousemove=e=>{if(isDrawing) draw(e,curCol);};
-    c.onmouseup=()=>{isDrawing=false;};
+    const c = document.getElementById('flagCanvas'), ctx = c.getContext('2d');
+    ctx.fillStyle="#fff"; ctx.fillRect(0,0,100,60);
+    const pal = document.getElementById('paletteBox');
+    ['#000','#fff','#f00','#0f0','#00f','#ff0'].forEach(col => { const d=document.createElement('div'); d.className='color-dot'; d.style.background=col; d.onclick=()=>cur=col; pal.appendChild(d); });
+    let cur="#000", draw=false;
+    c.onmousedown=()=>{draw=true}; c.onmouseup=()=>{draw=false};
+    c.onmousemove=e=>{if(draw){ const r=c.getBoundingClientRect(); ctx.fillStyle=cur; ctx.fillRect(Math.floor((e.clientX-r.left)/10)*10, Math.floor((e.clientY-r.top)/10)*10, 10, 10); }};
   }
-  function draw(e,c){const r=e.target.getBoundingClientRect(); ctx.fillStyle=c; ctx.fillRect(Math.floor((e.clientX-r.left)/10)*10, Math.floor((e.clientY-r.top)/10)*10, 10, 10);}
-  async function saveFlag(){myData.flag=document.getElementById('flagCanvas').toDataURL(); await manualSave();}
+  async function saveFlag(){ myData.flag = document.getElementById('flagCanvas').toDataURL(); manualSave(); }
 </script></body> </html>
