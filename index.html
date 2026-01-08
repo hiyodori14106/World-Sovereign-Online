@@ -1,616 +1,573 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Strategy: Secure Ultimate</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Global Strategy: Secure Ultimate</title>
+  
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+  
+  <!-- Libraries -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+  <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
+
+  <style>
+    :root {
+      --bg-color: #050505;
+      --panel-bg: rgba(15, 20, 25, 0.95);
+      --neon-blue: #00f3ff;
+      --neon-red: #ff0055;
+      --neon-green: #00ff99;
+      --neon-gold: #ffcc00;
+    }
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background-color: var(--bg-color);
+      color: #e0e6ed;
+      margin: 0; padding: 0;
+      height: 100vh; overflow: hidden;
+    }
+    /* Layout */
+    .app-container { display: flex; height: 100%; }
+    .map-section { flex: 1; position: relative; }
+    #gameMap { width: 100%; height: 100%; background: #0b0b0b; }
     
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+    /* Sidebar */
+    .sidebar {
+      width: 360px;
+      background: var(--panel-bg);
+      border-left: 1px solid #333;
+      display: flex; flex-direction: column;
+      padding: 15px;
+      box-shadow: -5px 0 20px rgba(0,0,0,0.8);
+      z-index: 100;
+      overflow-y: auto;
+    }
+    h1 { color: var(--neon-blue); text-align: center; font-family: 'Orbitron'; font-size: 1.4em; border-bottom: 2px solid var(--neon-blue); padding-bottom: 10px; margin-top: 0; }
+    h3 { color: var(--neon-gold); font-size: 0.9em; margin-top: 15px; border-left: 3px solid var(--neon-gold); padding-left: 8px; font-family: 'Orbitron'; }
     
-    <!-- Libraries: Leaflet, Draw, Turf(geometry math) -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
-    <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
-
-    <style>
-        :root {
-            --bg-color: #050505;
-            --panel-bg: rgba(15, 20, 25, 0.95);
-            --neon-blue: #00f3ff;
-            --neon-red: #ff0055;
-            --neon-green: #00ff99;
-            --neon-gold: #ffcc00;
-        }
-
-        body {
-            font-family: 'Noto Sans JP', sans-serif;
-            background-color: var(--bg-color);
-            color: #e0e6ed;
-            margin: 0; padding: 0;
-            height: 100vh; overflow: hidden;
-        }
-
-        /* Layout */
-        .app-container { display: flex; height: 100%; }
-        .map-section { flex: 1; position: relative; }
-        #gameMap { width: 100%; height: 100%; background: #0b0b0b; }
-
-        /* Sidebar */
-        .sidebar {
-            width: 360px;
-            background: var(--panel-bg);
-            border-left: 1px solid #333;
-            display: flex; flex-direction: column;
-            padding: 15px;
-            box-shadow: -5px 0 20px rgba(0,0,0,0.8);
-            z-index: 100;
-            overflow-y: auto;
-        }
-
-        h1 { color: var(--neon-blue); text-align: center; font-family: 'Orbitron'; font-size: 1.4em; border-bottom: 2px solid var(--neon-blue); padding-bottom: 10px; margin-top: 0; }
-        h3 { color: var(--neon-gold); font-size: 0.9em; margin-top: 15px; border-left: 3px solid var(--neon-gold); padding-left: 8px; font-family: 'Orbitron'; }
-
-        /* Stats */
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
-        .stat-card { background: #1a1a1a; padding: 8px; border-radius: 4px; text-align: center; border: 1px solid #333; }
-        .stat-val { font-family: 'Orbitron'; font-size: 1.1em; color: white; display: block; }
-        .stat-label { font-size: 0.7em; color: #888; }
-
-        /* UI Elements */
-        button {
-            width: 100%; padding: 10px; margin-bottom: 5px;
-            border: none; border-radius: 4px; cursor: pointer; font-weight: bold;
-            font-family: 'Noto Sans JP'; transition: 0.2s;
-        }
-        button:hover { filter: brightness(1.2); }
-        button:disabled { filter: grayscale(1); opacity: 0.5; cursor: not-allowed; }
-        .btn-main { background: var(--neon-blue); color: black; }
-        .btn-war { background: var(--neon-red); color: white; }
-        .btn-buy { background: var(--neon-green); color: black; }
-        .btn-sub { background: #333; color: #ccc; }
-
-        input { background: #222; border: 1px solid #555; color: white; padding: 10px; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
-
-        /* Tabs */
-        .tabs { display: flex; gap: 2px; margin-bottom: 10px; }
-        .tab { flex: 1; padding: 8px; background: #222; color: #888; text-align: center; cursor: pointer; font-size: 0.8em; }
-        .tab.active { background: #333; color: var(--neon-blue); border-bottom: 2px solid var(--neon-blue); }
-
-        /* Canvas & Flag */
-        canvas { border: 1px solid #555; background: #000; cursor: crosshair; image-rendering: pixelated; margin: 0 auto; display: block;}
-        .palette { display: flex; justify-content: center; gap: 5px; margin-top: 5px; flex-wrap: wrap;}
-        .color-dot { width: 20px; height: 20px; border-radius: 50%; border: 1px solid #fff; cursor: pointer; }
-        .pop-flag { width: 80px; height: 50px; border: 1px solid #ccc; display: block; margin: 0 auto 5px auto; image-rendering: pixelated; }
-
-        /* Modals */
-        .overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); z-index: 9999;
-            display: flex; justify-content: center; align-items: center;
-        }
-        .modal {
-            background: #111; border: 1px solid var(--neon-blue); padding: 30px;
-            width: 400px; max-width: 90%; text-align: center; border-radius: 8px;
-            box-shadow: 0 0 30px rgba(0,243,255,0.1);
-        }
-        .hidden { display: none !important; }
-
-        /* Admin Panel */
-        #adminPanel {
-            position: fixed; top: 50px; left: 50px; right: 50px; bottom: 50px;
-            background: #000; border: 2px solid var(--neon-red); z-index: 10000;
-            padding: 20px; overflow-y: auto; color: var(--neon-red);
-        }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; color: #ccc; }
-        th, td { border: 1px solid #333; padding: 8px; text-align: left; }
-        th { background: #222; }
-    </style>
+    /* Stats */
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
+    .stat-card { background: #1a1a1a; padding: 8px; border-radius: 4px; text-align: center; border: 1px solid #333; }
+    .stat-val { font-family: 'Orbitron'; font-size: 1.1em; color: white; display: block; }
+    .stat-label { font-size: 0.7em; color: #888; }
+    
+    /* UI Elements */
+    button {
+      width: 100%; padding: 10px; margin-bottom: 5px;
+      border: none; border-radius: 4px; cursor: pointer; font-weight: bold;
+      font-family: 'Noto Sans JP'; transition: 0.2s;
+    }
+    button:hover { filter: brightness(1.2); }
+    button:disabled { filter: grayscale(1); opacity: 0.5; cursor: not-allowed; }
+    .btn-main { background: var(--neon-blue); color: black; }
+    .btn-war { background: var(--neon-red); color: white; }
+    .btn-buy { background: var(--neon-green); color: black; }
+    .btn-sub { background: #333; color: #ccc; }
+    input { background: #222; border: 1px solid #555; color: white; padding: 10px; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
+    
+    /* Tabs */
+    .tabs { display: flex; gap: 2px; margin-bottom: 10px; }
+    .tab { flex: 1; padding: 8px; background: #222; color: #888; text-align: center; cursor: pointer; font-size: 0.8em; }
+    .tab.active { background: #333; color: var(--neon-blue); border-bottom: 2px solid var(--neon-blue); }
+    
+    /* Canvas & Flag */
+    canvas { border: 1px solid #555; background: #000; cursor: crosshair; image-rendering: pixelated; margin: 0 auto; display: block;}
+    .palette { display: flex; justify-content: center; gap: 5px; margin-top: 5px; flex-wrap: wrap;}
+    .color-dot { width: 20px; height: 20px; border-radius: 50%; border: 1px solid #fff; cursor: pointer; }
+    .pop-flag { width: 80px; height: 50px; border: 1px solid #ccc; display: block; margin: 0 auto 5px auto; image-rendering: pixelated; }
+    
+    /* Modals */
+    .overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.9); z-index: 9999;
+      display: flex; justify-content: center; align-items: center;
+    }
+    .modal {
+      background: #111; border: 1px solid var(--neon-blue); padding: 30px;
+      width: 400px; max-width: 90%; text-align: center; border-radius: 8px;
+      box-shadow: 0 0 30px rgba(0,243,255,0.1);
+    }
+    .hidden { display: none !important; }
+    
+    /* Admin Panel */
+    #adminPanel {
+      position: fixed; top: 50px; left: 50px; right: 50px; bottom: 50px;
+      background: #000; border: 2px solid var(--neon-red); z-index: 10000;
+      padding: 20px; overflow-y: auto; color: var(--neon-red);
+    }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; color: #ccc; }
+    th, td { border: 1px solid #333; padding: 8px; text-align: left; }
+    th { background: #222; }
+  </style>
 </head>
 <body>
 
 <!-- 1. Start / Menu Overlay -->
 <div id="overlayStart" class="overlay">
-    <!-- Main Menu -->
-    <div id="menuMain" class="modal">
-        <h1>Global Strategy</h1>
-        <p style="color:#aaa;">領土争奪・国家運営シミュレーション</p>
-        <div id="loadingMsg" style="color:var(--neon-green); margin-bottom:10px; display:none;">自動ログイン中...</div>
-        <button class="btn-main" onclick="showScreen('Register')">🌍 新規建国</button>
-        <button class="btn-buy" onclick="showScreen('Login')">🔑 ログイン</button>
-    </div>
+  <!-- Main Menu -->
+  <div id="menuMain" class="modal">
+    <h1>Global Strategy</h1>
+    <p style="color:#aaa;">領土争奪・国家運営シミュレーション</p>
+    <div id="loadingMsg" style="color:var(--neon-green); margin-bottom:10px; display:none;">自動ログイン中...</div>
+    <button class="btn-main" onclick="showScreen('Register')">🌍 新規建国</button>
+    <button class="btn-buy" onclick="showScreen('Login')">🔑 ログイン</button>
+  </div>
 
-    <!-- Register -->
-    <div id="menuRegister" class="modal hidden">
-        <h2>新規建国</h2>
-        <input type="text" id="regName" placeholder="国名 (重複不可)">
-        <input type="password" id="regPass" placeholder="パスワード">
-        <p style="font-size:0.8em; color:gray;">初期資金: $20,000,000</p>
-        <button class="btn-main" onclick="register()">アカウント作成</button>
-        <button class="btn-sub" onclick="showScreen('Main')">戻る</button>
-    </div>
+  <!-- Register -->
+  <div id="menuRegister" class="modal hidden">
+    <h2>新規建国</h2>
+    <input type="text" id="regName" placeholder="国名 (重複不可)">
+    <input type="password" id="regPass" placeholder="パスワード">
+    <p style="font-size:0.8em; color:gray;">初期資金: $20,000,000</p>
+    <button class="btn-main" onclick="register()">アカウント作成</button>
+    <button class="btn-sub" onclick="showScreen('Main')">戻る</button>
+  </div>
 
-    <!-- Login -->
-    <div id="menuLogin" class="modal hidden">
-        <h2>入国審査</h2>
-        <input type="text" id="loginName" placeholder="国名">
-        <input type="password" id="loginPass" placeholder="パスワード">
-        <button class="btn-buy" onclick="login()">ログイン</button>
-        <button class="btn-sub" onclick="showScreen('Main')">戻る</button>
-        <div id="loginMsg" style="color:red; margin-top:10px;"></div>
-    </div>
+  <!-- Login -->
+  <div id="menuLogin" class="modal hidden">
+    <h2>入国審査</h2>
+    <input type="text" id="loginName" placeholder="国名">
+    <input type="password" id="loginPass" placeholder="パスワード">
+    <button class="btn-buy" onclick="login()">ログイン</button>
+    <button class="btn-sub" onclick="showScreen('Main')">戻る</button>
+    <div id="loginMsg" style="color:red; margin-top:10px;"></div>
+  </div>
 </div>
 
 <!-- 2. Admin Auth Overlay -->
 <div id="overlayAdminAuth" class="overlay hidden">
-    <div class="modal" style="border-color: var(--neon-red);">
-        <h2 style="color:var(--neon-red)">ADMIN AUTH</h2>
-        <p style="font-size:0.8em; color:gray;">Enter Admin Password</p>
-        <input type="password" id="adminKey" placeholder="Password">
-        <button class="btn-war" onclick="attemptAdminLogin()">UNLOCK</button>
-        <button class="btn-sub" onclick="document.getElementById('overlayAdminAuth').classList.add('hidden')">CANCEL</button>
-    </div>
+  <div class="modal" style="border-color: var(--neon-red);">
+    <h2 style="color:var(--neon-red)">ADMIN AUTH</h2>
+    <p style="font-size:0.8em; color:gray;">Enter Admin Password</p>
+    <input type="password" id="adminKey" placeholder="Password">
+    <button class="btn-war" onclick="attemptAdminLogin()">UNLOCK</button>
+    <button class="btn-sub" onclick="document.getElementById('overlayAdminAuth').classList.add('hidden')">CANCEL</button>
+  </div>
 </div>
 
 <!-- 3. Admin Panel (Hidden) -->
 <div id="adminPanel" class="hidden">
-    <h2>⚠️ SERVER CONSOLE</h2>
-    <div style="margin-bottom:10px;">
-        <button class="btn-sub" style="width:100px;" onclick="closeAdmin()">CLOSE</button>
-        <button class="btn-main" style="width:150px;" onclick="refreshAdminList()">REFRESH</button>
-        <button class="btn-war" style="width:150px;" onclick="adminLogout()">LOGOUT</button>
-    </div>
-    <table>
-        <thead><tr><th>Country</th><th>Pass</th><th>Money ($)</th><th>Area</th><th>Action</th></tr></thead>
-        <tbody id="adminTableBody"></tbody>
-    </table>
+  <h2>⚠️ SERVER CONSOLE</h2>
+  <div style="margin-bottom:10px;">
+    <button class="btn-sub" style="width:100px;" onclick="closeAdmin()">CLOSE</button>
+    <button class="btn-main" style="width:150px;" onclick="refreshAdminList()">REFRESH</button>
+    <button class="btn-war" style="width:150px;" onclick="adminLogout()">LOGOUT</button>
+  </div>
+  <table>
+    <thead><tr><th>Country</th><th>Pass</th><th>Money ($)</th><th>Area</th><th>Action</th></tr></thead>
+    <tbody id="adminTableBody"></tbody>
+  </table>
 </div>
 
 <!-- 4. Game Interface -->
 <div id="gameUI" class="app-container hidden">
-    <div class="map-section">
-        <div id="gameMap"></div>
-        <div id="mapMsg" style="position:absolute; top:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.9); padding:15px; border:2px solid var(--neon-gold); color:var(--neon-gold); display:none; pointer-events:none; text-align:center;">
-            <b>【領土描画モード】</b><br>
-            空いている場所に領土を描いてください。<br>
-            <span style="font-size:0.8em; color:white;">他国と重なると無効になります。</span>
-        </div>
+  <div class="map-section">
+    <div id="gameMap"></div>
+    <div id="mapMsg" style="position:absolute; top:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.9); padding:15px; border:2px solid var(--neon-gold); color:var(--neon-gold); display:none; pointer-events:none; text-align:center;">
+      <b>【領土描画モード】</b><br>
+      空いている場所に領土を描いてください。<br>
+      <span style="font-size:0.8em; color:white;">他国と重なると無効になります。</span>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <h1><span id="uiName">NATION</span></h1>
+     
+    <div class="stats-grid">
+      <div class="stat-card"><span class="stat-label">資金</span><span class="stat-val" id="valMoney">0</span><span style="font-size:0.7em">$</span></div>
+      <div class="stat-card"><span class="stat-label">面積</span><span class="stat-val" id="valArea">0</span><span style="font-size:0.7em">km²</span></div>
+      <div class="stat-card"><span class="stat-label">GDP</span><span class="stat-val" id="valGDP">0</span><span style="font-size:0.7em">$</span></div>
+      <div class="stat-card"><span class="stat-label">軍事力</span><span class="stat-val" id="valMil">0</span></div>
     </div>
 
-    <div class="sidebar">
-        <h1><span id="uiName">NATION</span></h1>
-        
-        <div class="stats-grid">
-            <div class="stat-card"><span class="stat-label">資金</span><span class="stat-val" id="valMoney">0</span><span style="font-size:0.7em">$</span></div>
-            <div class="stat-card"><span class="stat-label">面積</span><span class="stat-val" id="valArea">0</span><span style="font-size:0.7em">km²</span></div>
-            <div class="stat-card"><span class="stat-label">GDP</span><span class="stat-val" id="valGDP">0</span><span style="font-size:0.7em">$</span></div>
-            <div class="stat-card"><span class="stat-label">軍事力</span><span class="stat-val" id="valMil">0</span></div>
-        </div>
-
-        <div class="tabs">
-            <div class="tab active" onclick="setTab('main')">内政</div>
-            <div class="tab" onclick="setTab('war')">軍事</div>
-            <div class="tab" onclick="setTab('flag')">国旗</div>
-        </div>
-
-        <!-- Main Tab -->
-        <div id="tab-main">
-            <h3>経済</h3>
-            <button class="btn-main" onclick="invest()">🏭 産業投資 (-$2000)</button>
-            <div style="margin-top:5px; font-size:0.8em; color:#aaa;">
-                所得税: <span id="taxVal">10</span>%
-                <input type="range" id="taxRate" min="0" max="50" value="10" onchange="document.getElementById('taxVal').innerText=this.value">
-            </div>
-            
-            <h3>領土管理</h3>
-            <p style="font-size:0.8em; color:#aaa;">コスト: $100 / km²</p>
-            <button class="btn-buy" onclick="startExpansion()">🗺️ 領土購入・描画</button>
-
-            <h3>システム</h3>
-            <button class="btn-sub" onclick="manualSave()">💾 サーバー保存</button>
-            <button class="btn-sub" onclick="doLogout()">🚪 ログアウト</button>
-        </div>
-
-        <!-- War Tab -->
-        <div id="tab-war" class="hidden">
-            <h3>軍備</h3>
-            <button class="btn-war" onclick="recruit()">⚔️ 兵士雇用 (-$1000)</button>
-            
-            <h3>外交ターゲット</h3>
-            <div class="stat-card" style="text-align:left; margin-bottom:10px;">
-                Target: <b id="targetName" style="color:var(--neon-blue)">None</b><br>
-                Status: <span id="targetStatus">---</span>
-            </div>
-            <button class="btn-buy" id="btnAlly" onclick="actionAlly()" disabled>🤝 同盟</button>
-            <button class="btn-war" id="btnWar" onclick="actionWar()" disabled>💣 宣戦布告</button>
-        </div>
-
-        <!-- Flag Tab -->
-        <div id="tab-flag" class="hidden">
-            <h3>国旗エディタ</h3>
-            <canvas id="flagCanvas" width="100" height="60"></canvas>
-            <div class="palette" id="paletteBox"></div>
-            <button class="btn-main" style="margin-top:10px;" onclick="saveFlag()">💾 国旗を保存</button>
-            <button class="btn-sub" onclick="clearFlag()">🗑 クリア</button>
-        </div>
-        
-        <div style="margin-top:auto; font-size:0.7em; color:#555; text-align:center;">Shift+Alt: Admin</div>
+    <div class="tabs">
+      <div class="tab active" onclick="setTab('main')">内政</div>
+      <div class="tab" onclick="setTab('war')">軍事</div>
+      <div class="tab" onclick="setTab('flag')">国旗</div>
     </div>
+
+    <!-- Main Tab -->
+    <div id="tab-main">
+      <h3>経済</h3>
+      <button class="btn-main" onclick="invest()">🏭 産業投資 (-$2000)</button>
+      <div style="margin-top:5px; font-size:0.8em; color:#aaa;">
+        所得税: <span id="taxVal">10</span>%
+        <input type="range" id="taxRate" min="0" max="50" value="10" onchange="document.getElementById('taxVal').innerText=this.value">
+      </div>
+       
+      <h3>領土管理</h3>
+      <p style="font-size:0.8em; color:#aaa;">コスト: $100 / km²</p>
+      <button class="btn-buy" onclick="startExpansion()">🗺️ 領土購入・描画</button>
+
+      <h3>システム</h3>
+      <button class="btn-sub" onclick="manualSave()">💾 サーバー保存</button>
+      <button class="btn-sub" onclick="doLogout()">🚪 ログアウト</button>
+    </div>
+
+    <!-- War Tab -->
+    <div id="tab-war" class="hidden">
+      <h3>軍備</h3>
+      <button class="btn-war" onclick="recruit()">⚔️ 兵士雇用 (-$1000)</button>
+       
+      <h3>外交ターゲット</h3>
+      <div class="stat-card" style="text-align:left; margin-bottom:10px;">
+        Target: <b id="targetName" style="color:var(--neon-blue)">None</b><br>
+        Status: <span id="targetStatus">---</span>
+      </div>
+      <button class="btn-buy" id="btnAlly" onclick="actionAlly()" disabled>🤝 同盟</button>
+      <button class="btn-war" id="btnWar" onclick="actionWar()" disabled>💣 宣戦布告</button>
+    </div>
+
+    <!-- Flag Tab -->
+    <div id="tab-flag" class="hidden">
+      <h3>国旗エディタ</h3>
+      <canvas id="flagCanvas" width="100" height="60"></canvas>
+      <div class="palette" id="paletteBox"></div>
+      <button class="btn-main" style="margin-top:10px;" onclick="saveFlag()">💾 国旗を保存</button>
+      <button class="btn-sub" onclick="clearFlag()">🗑 クリア</button>
+    </div>
+     
+    <div style="margin-top:auto; font-size:0.7em; color:#555; text-align:center;">Shift+Alt: Admin</div>
+  </div>
 </div>
 
 <script>
-    // --- Configuration ---
-    const PANTRY_ID = "6ac44d17-1f5d-4931-a51f-9a540cca1ef7"; 
-    const BASKET_NAME = "strategy_complete_final"; 
-    const API_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/${BASKET_NAME}`;
-    
-    // ★ セキュリティ: パスワードのハッシュ値 (SHA-256)
-    // "201305042020302" をハッシュ化すると以下の値になります
-    const ADMIN_HASH = "d1133275ee3cd7b72c676239169019688195a932d56a7d52a79234b077a76c6c";
+  // --- Configuration ---
+  const PANTRY_ID = "6ac44d17-1f5d-4931-a51f-9a540cca1ef7";
+  const BASKET_NAME = "strategy_complete_final";
+  const API_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/${BASKET_NAME}`;
 
-    // --- State Variables ---
-    let myName = "", myData = {};
-    let map, drawnItems, drawControl;
-    let selectedTarget = null;
-    let expansionMode = false;
+  // 管理者パスワード(201305042020302)のハッシュ値
+  const ADMIN_HASH = "d1133275ee3cd7b72c676239169019688195a932d56a7d52a79234b077a76c6c";
 
-    // --- Startup Check ---
-    window.onload = function() {
-        // Admin Auto-Login Check
-        if(localStorage.getItem('adminSession') === 'active') {
-            console.log("Admin Session Active");
-        }
-        // User Auto-Login Check
-        const savedName = localStorage.getItem('autoName');
-        const savedPass = localStorage.getItem('autoPass');
-        if(savedName && savedPass) {
-            document.getElementById('loadingMsg').style.display = 'block';
-            login(savedName, savedPass);
-        }
-    };
+  // --- State Variables ---
+  let myName = "", myData = {};
+  let map, drawnItems, drawControl;
+  let selectedTarget = null;
+  let expansionMode = false;
 
-    // --- Key Events ---
-    document.addEventListener('keydown', (e) => {
-        if(e.shiftKey && e.altKey) {
-            if(localStorage.getItem('adminSession') === 'active') {
-                document.getElementById('overlayAdminAuth').classList.add('hidden');
-                document.getElementById('adminPanel').classList.remove('hidden');
-                refreshAdminList();
-            } else {
-                document.getElementById('overlayAdminAuth').classList.remove('hidden');
-            }
-        }
+  // --- Startup Check ---
+  window.onload = function() {
+    const savedName = localStorage.getItem('autoName');
+    const savedPass = localStorage.getItem('autoPass');
+    if(savedName && savedPass) {
+      document.getElementById('loadingMsg').style.display = 'block';
+      login(savedName, savedPass);
+    }
+  };
+
+  // --- Key Events (管理者画面を開く) ---
+  document.addEventListener('keydown', (e) => {
+    // Shift と Alt を同時に押すと管理者画面
+    if(e.shiftKey && e.altKey) {
+      if(localStorage.getItem('adminSession') === 'active') {
+        document.getElementById('overlayAdminAuth').classList.add('hidden');
+        document.getElementById('adminPanel').classList.remove('hidden');
+        refreshAdminList();
+      } else {
+        document.getElementById('overlayAdminAuth').classList.remove('hidden');
+      }
+    }
+  });
+
+  // --- Cryptography ---
+  async function sha256(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // --- View Controller ---
+  function showScreen(id) {
+    ['Main','Register','Login'].forEach(n => document.getElementById('menu'+n).classList.add('hidden'));
+    document.getElementById('menu'+id).classList.remove('hidden');
+  }
+
+  function setTab(id) {
+    document.querySelectorAll('[id^="tab-"]').forEach(e => e.classList.add('hidden'));
+    document.getElementById('tab-'+id).classList.remove('hidden');
+    document.querySelectorAll('.tab').forEach(e => e.classList.remove('active'));
+    event.target.classList.add('active');
+  }
+
+  // --- Database ---
+  async function getDB() {
+    try {
+      const r = await fetch(API_URL);
+      if(r.ok) return await r.json();
+    } catch(e){}
+    return { nations: {} };
+  }
+
+  async function saveDB(fullData) {
+    await fetch(API_URL, { 
+      method:"POST", 
+      headers:{"Content-Type":"application/json"}, 
+      body:JSON.stringify(fullData) 
     });
+  }
 
-    // --- Cryptography (Hash Function) ---
-    async function sha256(message) {
-        const msgBuffer = new TextEncoder().encode(message);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  // --- Auth Logic ---
+  async function register() {
+    const name = document.getElementById('regName').value;
+    const pass = document.getElementById('regPass').value;
+    if(!name || !pass) return alert("入力が不足しています");
+    const db = await getDB();
+    if(db.nations && db.nations[name]) return alert("その国名は既に存在します");
+    if(!db.nations) db.nations = {};
+    db.nations[name] = {
+      pass: pass,
+      money: 20000000,
+      gdp: 5000,
+      military: 500,
+      area: 0,
+      geometries: [],
+      allies: [],
+      flag: null
+    };
+    await saveDB(db);
+    alert("建国完了。ログインしてください。");
+    showScreen('Login');
+  }
+
+  async function login(autoName, autoPass) {
+    const name = autoName || document.getElementById('loginName').value;
+    const pass = autoPass || document.getElementById('loginPass').value;
+    const msg = document.getElementById('loginMsg');
+    if(!autoName && msg) msg.innerText = "通信中...";
+    const db = await getDB();
+    const n = db.nations ? db.nations[name] : null;
+    if(!n) { if(msg) msg.innerText="国が存在しません"; return; }
+    if(n.pass !== pass) { if(msg) msg.innerText="パスワード不一致"; return; }
+    
+    localStorage.setItem('autoName', name);
+    localStorage.setItem('autoPass', pass);
+    myName = name;
+    myData = n;
+    if(!myData.geometries) myData.geometries = [];
+    if(!myData.allies) myData.allies = [];
+    startGame(db);
+  }
+
+  function doLogout() {
+    if(confirm("ログアウトしますか？")) {
+      localStorage.removeItem('autoName');
+      localStorage.removeItem('autoPass');
+      location.reload();
     }
+  }
 
-    // --- View Controller ---
-    function showScreen(id) {
-        ['Main','Register','Login'].forEach(n => document.getElementById('menu'+n).classList.add('hidden'));
-        document.getElementById('menu'+id).classList.remove('hidden');
+  function startGame(db) {
+    document.getElementById('overlayStart').classList.add('hidden');
+    document.getElementById('gameUI').classList.remove('hidden');
+    initMap();
+    initFlagEditor();
+    renderWorld(db.nations);
+    refreshUI();
+    if(myData.area === 0) {
+      alert("ようこそ！\n内政タブの「領土購入・描画」から建国してください。");
     }
-    function setTab(id) {
-        document.querySelectorAll('[id^="tab-"]').forEach(e => e.classList.add('hidden'));
-        document.getElementById('tab-'+id).classList.remove('hidden');
-        document.querySelectorAll('.tab').forEach(e => e.classList.remove('active'));
-        event.target.classList.add('active');
-    }
+    setInterval(ecoTick, 5000);
+  }
 
-    // --- Database ---
-    async function getDB() {
-        try {
-            const r = await fetch(API_URL);
-            if(r.ok) return await r.json();
-        } catch(e){}
-        return { nations: {} };
-    }
-    async function saveDB(fullData) {
-        await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(fullData) });
-    }
+  // --- Map System ---
+  function initMap() {
+    if(map) return;
+    map = L.map('gameMap').setView([35, 135], 4);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+    drawnItems = new L.FeatureGroup();
+    map.addLayer(drawnItems);
+    map.on('popupopen', e => {
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = e.popup.getContent();
+      const bTag = tempDiv.querySelector('b');
+      if(bTag) {
+        const target = bTag.innerText;
+        if(target !== myName) selectTarget(target);
+      }
+    });
+  }
 
-    // --- Auth Logic ---
-    async function register() {
-        const name = document.getElementById('regName').value;
-        const pass = document.getElementById('regPass').value;
-        if(!name || !pass) return alert("入力が不足しています");
+  function renderWorld(nations) {
+    drawnItems.clearLayers();
+    if(!nations) return;
+    Object.keys(nations).forEach(key => {
+      const n = nations[key];
+      const isMe = (key === myName);
+      const isAlly = myData.allies.includes(key);
+      let color = isMe ? "#00f3ff" : (isAlly ? "#00ff99" : "#ff0055");
+      const flagImg = n.flag ? `<img src="${n.flag}" class="pop-flag">` : "";
+      (n.geometries || []).forEach(geo => {
+        L.geoJSON(geo, { style: { color: color, weight: 2, fillOpacity: 0.3 } })
+        .bindPopup(`<div style="text-align:center;">${flagImg}<b>${key}</b><br>軍事: ${n.military}<br>GDP: $${n.gdp.toLocaleString()}</div>`)
+        .addTo(drawnItems);
+      });
+    });
+  }
 
-        const db = await getDB();
-        if(db.nations && db.nations[name]) return alert("その国名は既に存在します");
-
-        if(!db.nations) db.nations = {};
-        db.nations[name] = {
-            pass: pass,
-            money: 20000000, // 初期資金 $20M
-            gdp: 5000,
-            military: 500,
-            area: 0,
-            geometries: [],
-            allies: [],
-            flag: null
-        };
-        await saveDB(db);
-        alert("建国完了。ログインしてください。");
-        showScreen('Login');
-    }
-
-    async function login(autoName, autoPass) {
-        const name = autoName || document.getElementById('loginName').value;
-        const pass = autoPass || document.getElementById('loginPass').value;
-        const msg = document.getElementById('loginMsg');
-        
-        if(!autoName) msg.innerText = "通信中...";
-
-        const db = await getDB();
-        const n = db.nations ? db.nations[name] : null;
-
-        if(!n) { if(msg) msg.innerText="国が存在しません"; return; }
-        if(n.pass !== pass) { if(msg) msg.innerText="パスワード不一致"; return; }
-
-        // Success
-        localStorage.setItem('autoName', name);
-        localStorage.setItem('autoPass', pass);
-        myName = name;
-        myData = n;
-        
-        // Data Integrity Check
-        if(!myData.geometries) myData.geometries = [];
-        if(!myData.allies) myData.allies = [];
-
-        startGame(db);
-    }
-
-    function doLogout() {
-        if(confirm("ログアウトしますか？")) {
-            localStorage.removeItem('autoName');
-            localStorage.removeItem('autoPass');
-            location.reload();
-        }
-    }
-
-    function startGame(db) {
-        document.getElementById('overlayStart').classList.add('hidden');
-        document.getElementById('gameUI').classList.remove('hidden');
-
-        initMap();
-        initFlagEditor();
-        renderWorld(db.nations);
-        refreshUI();
-
-        if(myData.area === 0) {
-            alert("ようこそ！\n内政タブの「領土購入・描画」から建国してください。\n(初期上限: 100,000km²)");
-        }
-        setInterval(ecoTick, 5000);
-    }
-
-    // --- Map System ---
-    function initMap() {
-        if(map) return;
-        map = L.map('gameMap').setView([35, 135], 4);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
-        
-        drawnItems = new L.FeatureGroup();
-        map.addLayer(drawnItems);
-
-        map.on('popupopen', e => {
-            const div = document.createElement('div');
-            div.innerHTML = e.popup.getContent();
-            const target = div.querySelector('b').innerText;
-            if(target !== myName) selectTarget(target);
+  function startExpansion() {
+    expansionMode = true;
+    document.getElementById('mapMsg').style.display = 'block';
+    if(drawControl) map.removeControl(drawControl);
+    drawControl = new L.Control.Draw({
+      draw: { polygon: { allowIntersection: false }, rectangle:true, circle:false, marker:false, polyline:false, circlemarker:false },
+      edit: false
+    });
+    map.addControl(drawControl);
+    map.off(L.Draw.Event.CREATED);
+    map.on(L.Draw.Event.CREATED, async e => {
+      if(!expansionMode) return;
+      const newLayer = e.layer;
+      const newGeo = newLayer.toGeoJSON();
+      const latlngs = newLayer.getLatLngs()[0];
+      const area = Math.round(L.GeometryUtil.geodesicArea(latlngs)/1000000);
+      
+      if(myData.area === 0 && area > 100000) {
+        alert(`初期制限: 100,000km² 以下にしてください。`);
+        map.removeLayer(newLayer); return;
+      }
+      
+      const db = await getDB();
+      let isOverlap = false;
+      Object.keys(db.nations || {}).forEach(k => {
+        if(k === myName) return;
+        const n = db.nations[k];
+        (n.geometries || []).forEach(geo => {
+          try { if(turf.intersect(newGeo, geo)) isOverlap = true; } catch(err){}
         });
+      });
+
+      if(isOverlap) {
+        alert("⚠️ 他国の領土と重なっています！");
+        map.removeLayer(newLayer); return;
+      }
+
+      const cost = (myData.area === 0) ? 0 : area * 100;
+      if(myData.money >= cost) {
+        if(confirm(`面積: ${area.toLocaleString()} km²\n購入しますか？`)) {
+          myData.money -= cost;
+          myData.area += area;
+          myData.geometries.push(newGeo);
+          db.nations[myName] = myData;
+          await saveDB(db);
+          location.reload();
+        } else map.removeLayer(newLayer);
+      } else {
+        alert("資金不足");
+        map.removeLayer(newLayer);
+      }
+      expansionMode = false;
+      document.getElementById('mapMsg').style.display = 'none';
+      map.removeControl(drawControl);
+    });
+  }
+
+  // --- Flag Editor ---
+  let ctx, isDrawing=false; const PX=10;
+  function initFlagEditor() {
+    const c = document.getElementById('flagCanvas'); ctx = c.getContext('2d');
+    if(myData.flag) { const i=new Image(); i.onload=()=>ctx.drawImage(i,0,0); i.src=myData.flag; } 
+    else { ctx.fillStyle="#fff"; ctx.fillRect(0,0,100,60); }
+    const pal = document.getElementById('paletteBox'); pal.innerHTML="";
+    ['#000','#fff','#f00','#0f0','#00f','#ff0','#0ff','#f0f','#888','#840'].forEach(col=>{
+      const d=document.createElement('div'); d.className='color-dot'; d.style.background=col;
+      d.onclick=()=>{curCol=col;}; pal.appendChild(d);
+    });
+    let curCol='#000';
+    c.onmousedown=e=>{isDrawing=true; draw(e,curCol);};
+    c.onmousemove=e=>{if(isDrawing) draw(e,curCol);};
+    c.onmouseup=()=>{isDrawing=false;};
+  }
+  function draw(e,c){const r=e.target.getBoundingClientRect(); ctx.fillStyle=c; ctx.fillRect(Math.floor((e.clientX-r.left)/PX)*PX, Math.floor((e.clientY-r.top)/PX)*PX, PX, PX);}
+  function clearFlag(){ctx.fillStyle="#fff"; ctx.fillRect(0,0,100,60);}
+  async function saveFlag(){myData.flag=document.getElementById('flagCanvas').toDataURL(); await manualSave();}
+
+  // --- Game Logic ---
+  function refreshUI() {
+    document.getElementById('uiName').innerText = myName;
+    document.getElementById('valMoney').innerText = Math.floor(myData.money).toLocaleString();
+    document.getElementById('valArea').innerText = myData.area.toLocaleString();
+    document.getElementById('valGDP').innerText = Math.floor(myData.gdp).toLocaleString();
+    document.getElementById('valMil').innerText = myData.military.toLocaleString();
+  }
+  function ecoTick() {
+    const tax = parseInt(document.getElementById('taxRate').value) / 100;
+    myData.money += myData.gdp * tax; refreshUI();
+  }
+  function invest() { if(myData.money>=2000){myData.money-=2000; myData.gdp+=500; refreshUI();}else alert("資金不足"); }
+  function recruit() { if(myData.money>=1000){myData.money-=1000; myData.military+=100; refreshUI();}else alert("資金不足"); }
+  async function manualSave() { const db=await getDB(); db.nations[myName]=myData; await saveDB(db); alert("保存完了"); }
+
+  // --- War / Diplo ---
+  function selectTarget(name) {
+    selectedTarget = name; document.getElementById('targetName').innerText = name;
+    document.getElementById('btnAlly').disabled = false; document.getElementById('btnWar').disabled = false;
+    const isAlly = myData.allies.includes(name);
+    document.getElementById('targetStatus').innerText = isAlly ? "同盟中" : "中立/敵対";
+    document.getElementById('targetStatus').style.color = isAlly ? "#00ff99" : "#ccc";
+  }
+  async function actionAlly() {
+    if(!selectedTarget || myData.allies.includes(selectedTarget)) return alert("不可");
+    myData.allies.push(selectedTarget);
+    const db=await getDB(); db.nations[myName]=myData; await saveDB(db); alert("同盟締結"); location.reload();
+  }
+  async function actionWar() {
+    if(!selectedTarget || myData.allies.includes(selectedTarget)) return alert("不可");
+    const db = await getDB(); const en = db.nations[selectedTarget];
+    if(!en) return;
+    if(!confirm(`${selectedTarget} に宣戦布告しますか？`)) return;
+    const myPow = myData.military*(0.8+Math.random()*0.4);
+    const enPow = en.military*(0.8+Math.random()*0.4);
+    if(myPow > enPow) {
+      const loot = Math.floor(en.money*0.5); en.money -= loot; myData.money += loot;
+      if(confirm(`勝利！ $${loot.toLocaleString()}を略奪。併合しますか？`)) {
+        myData.geometries = myData.geometries.concat(en.geometries||[]);
+        myData.area += en.area; myData.gdp += Math.floor(en.gdp*0.5);
+        delete db.nations[selectedTarget]; alert("併合完了！");
+      }
+      db.nations[myName]=myData; if(db.nations[selectedTarget]) db.nations[selectedTarget]=en;
+      await saveDB(db); location.reload();
+    } else {
+      const loss = Math.floor(myData.money*0.3); myData.money -= loss; myData.military = Math.floor(myData.military*0.7);
+      alert("敗北しました..."); db.nations[myName]=myData; await saveDB(db); refreshUI();
     }
+  }
 
-    function renderWorld(nations) {
-        drawnItems.clearLayers();
-        if(!nations) return;
-        Object.keys(nations).forEach(key => {
-            const n = nations[key];
-            const isMe = (key === myName);
-            const isAlly = myData.allies.includes(key);
-            let color = isMe ? "#00f3ff" : (isAlly ? "#00ff99" : "#ff0055");
-            
-            const flagImg = n.flag ? `<img src="${n.flag}" class="pop-flag">` : "";
-
-            (n.geometries || []).forEach(geo => {
-                L.geoJSON(geo, { style: { color: color, weight: 2, fillOpacity: 0.3 } })
-                .bindPopup(`<div style="text-align:center;">${flagImg}<b>${key}</b><br>軍事: ${n.military}<br>GDP: $${n.gdp.toLocaleString()}</div>`)
-                .addTo(drawnItems);
-            });
-        });
+  // --- Admin System ---
+  async function attemptAdminLogin() {
+    const input = document.getElementById('adminKey').value;
+    const hash = await sha256(input);
+    if(hash === ADMIN_HASH) {
+      localStorage.setItem('adminSession', 'active');
+      document.getElementById('overlayAdminAuth').classList.add('hidden');
+      document.getElementById('adminPanel').classList.remove('hidden');
+      refreshAdminList();
+    } else { alert("Password Incorrect"); }
+  }
+  function closeAdmin() { document.getElementById('adminPanel').classList.add('hidden'); }
+  function adminLogout() { localStorage.removeItem('adminSession'); location.reload(); }
+  async function refreshAdminList() {
+    const t = document.getElementById('adminTableBody'); t.innerHTML = "Loading...";
+    const db = await getDB(); t.innerHTML = "";
+    Object.keys(db.nations||{}).forEach(k => {
+      const n = db.nations[k];
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${k}</td><td>(Protected)</td><td>${n.money.toLocaleString()}</td><td>${n.area}</td>
+      <td><button class="btn-war" style="padding:5px;width:auto;" onclick="del('${k}')">DEL</button></td>`;
+      t.appendChild(tr);
+    });
+  }
+  async function del(name) {
+    if(confirm("Delete " + name + "?")) {
+      const db=await getDB(); delete db.nations[name]; await saveDB(db); refreshAdminList();
     }
-
-    // --- Logic: Expansion & Overlap Check ---
-    function startExpansion() {
-        expansionMode = true;
-        document.getElementById('mapMsg').style.display = 'block';
-        
-        if(drawControl) map.removeControl(drawControl);
-        drawControl = new L.Control.Draw({
-            draw: { polygon: { allowIntersection: false }, rectangle:true, circle:false, marker:false, polyline:false, circlemarker:false },
-            edit: false
-        });
-        map.addControl(drawControl);
-
-        map.off(L.Draw.Event.CREATED);
-        map.on(L.Draw.Event.CREATED, async e => {
-            if(!expansionMode) return;
-            const newLayer = e.layer;
-            const newGeo = newLayer.toGeoJSON();
-            const latlngs = newLayer.getLatLngs()[0];
-            const area = Math.round(L.GeometryUtil.geodesicArea(latlngs)/1000000); // km2
-            
-            // 1. Initial Limit Check
-            if(myData.area === 0 && area > 100000) {
-                alert(`初期制限: 100,000km² 以下にしてください。\n(現在: ${area.toLocaleString()}km²)`);
-                map.removeLayer(newLayer); return;
-            }
-
-            // 2. Overlap Check (using Turf.js)
-            const db = await getDB();
-            let isOverlap = false;
-            
-            // Check against ALL polygons of ALL nations
-            Object.keys(db.nations || {}).forEach(k => {
-                if(k === myName) return; // Ignore self
-                const n = db.nations[k];
-                if(!n.geometries) return;
-                
-                n.geometries.forEach(geo => {
-                    try {
-                        if(turf.intersect(newGeo, geo)) isOverlap = true;
-                    } catch(err) { /* geometry error safe */ }
-                });
-            });
-
-            if(isOverlap) {
-                alert("⚠️ 他国の領土と重なっています！\n別の場所を選択してください。");
-                map.removeLayer(newLayer); return;
-            }
-
-            // 3. Purchase
-            const cost = (myData.area === 0) ? 0 : area * 100; // First time free(ish), else $100/km2
-            
-            if(myData.money >= cost) {
-                if(confirm(`面積: ${area.toLocaleString()} km²\n費用: $${cost.toLocaleString()}\n購入しますか？`)) {
-                    myData.money -= cost;
-                    myData.area += area;
-                    myData.geometries.push(newGeo);
-
-                    db.nations[myName] = myData;
-                    await saveDB(db);
-                    
-                    alert("領土を獲得しました！");
-                    location.reload();
-                } else map.removeLayer(newLayer);
-            } else {
-                alert(`資金不足 (必要: $${cost.toLocaleString()})`);
-                map.removeLayer(newLayer);
-            }
-
-            expansionMode = false;
-            document.getElementById('mapMsg').style.display = 'none';
-            map.removeControl(drawControl);
-        });
-    }
-
-    // --- Flag Editor ---
-    let ctx, isDrawing=false; const PX=10;
-    function initFlagEditor() {
-        const c = document.getElementById('flagCanvas'); ctx = c.getContext('2d');
-        if(myData.flag) { const i=new Image(); i.onload=()=>ctx.drawImage(i,0,0); i.src=myData.flag; } 
-        else { ctx.fillStyle="#fff"; ctx.fillRect(0,0,100,60); }
-        
-        const pal = document.getElementById('paletteBox'); pal.innerHTML="";
-        ['#000','#fff','#f00','#0f0','#00f','#ff0','#0ff','#f0f','#888','#840'].forEach(col=>{
-            const d=document.createElement('div'); d.className='color-dot'; d.style.background=col;
-            d.onclick=()=>{curCol=col;}; pal.appendChild(d);
-        });
-        let curCol='#000';
-        c.onmousedown=e=>{isDrawing=true; draw(e,curCol);};
-        c.onmousemove=e=>{if(isDrawing) draw(e,curCol);};
-        c.onmouseup=()=>{isDrawing=false;};
-    }
-    function draw(e,c){const r=e.target.getBoundingClientRect(); ctx.fillStyle=c;
-    ctx.fillRect(Math.floor((e.clientX-r.left)/PX)*PX, Math.floor((e.clientY-r.top)/PX)*PX, PX, PX);}
-    function clearFlag(){ctx.fillStyle="#fff"; ctx.fillRect(0,0,100,60);}
-    async function saveFlag(){myData.flag=document.getElementById('flagCanvas').toDataURL(); await manualSave();}
-
-    // --- Game Logic ---
-    function refreshUI() {
-        document.getElementById('uiName').innerText = myName;
-        document.getElementById('valMoney').innerText = Math.floor(myData.money).toLocaleString();
-        document.getElementById('valArea').innerText = myData.area.toLocaleString();
-        document.getElementById('valGDP').innerText = Math.floor(myData.gdp).toLocaleString();
-        document.getElementById('valMil').innerText = myData.military.toLocaleString();
-    }
-    function ecoTick() {
-        const tax = parseInt(document.getElementById('taxRate').value) / 100;
-        myData.money += myData.gdp * tax; refreshUI();
-    }
-    function invest() { if(myData.money>=2000){myData.money-=2000; myData.gdp+=500; refreshUI();}else alert("資金不足"); }
-    function recruit() { if(myData.money>=1000){myData.money-=1000; myData.military+=100; refreshUI();}else alert("資金不足"); }
-    async function manualSave() { const db=await getDB(); db.nations[myName]=myData; await saveDB(db); alert("保存完了"); }
-
-    // --- War / Diplo ---
-    function selectTarget(name) {
-        selectedTarget = name; document.getElementById('targetName').innerText = name;
-        document.getElementById('btnAlly').disabled = false; document.getElementById('btnWar').disabled = false;
-        const isAlly = myData.allies.includes(name);
-        document.getElementById('targetStatus').innerText = isAlly ? "同盟中" : "中立/敵対";
-        document.getElementById('targetStatus').style.color = isAlly ? "#00ff99" : "#ccc";
-    }
-    async function actionAlly() {
-        if(!selectedTarget || myData.allies.includes(selectedTarget)) return alert("不可");
-        myData.allies.push(selectedTarget); alert("同盟締結");
-        const db=await getDB(); db.nations[myName]=myData; await saveDB(db); location.reload();
-    }
-    async function actionWar() {
-        if(!selectedTarget || myData.allies.includes(selectedTarget)) return alert("不可");
-        const db = await getDB(); const en = db.nations[selectedTarget];
-        if(!en) return;
-        
-        if(!confirm(`${selectedTarget} (軍:${en.military}) に宣戦布告しますか？`)) return;
-        
-        const myPow = myData.military*(0.8+Math.random()*0.4);
-        const enPow = en.military*(0.8+Math.random()*0.4);
-        
-        if(myPow > enPow) {
-            const loot = Math.floor(en.money*0.5); en.money -= loot; myData.money += loot;
-            if(confirm(`勝利！ $${loot.toLocaleString()}を略奪。\n併合しますか？`)) {
-                myData.geometries = myData.geometries.concat(en.geometries||[]);
-                myData.area += en.area; myData.gdp += Math.floor(en.gdp*0.5);
-                delete db.nations[selectedTarget]; alert("併合完了！");
-            }
-            db.nations[myName]=myData; if(db.nations[selectedTarget]) db.nations[selectedTarget]=en;
-            await saveDB(db); location.reload();
-        } else {
-            const loss = Math.floor(myData.money*0.3); myData.money -= loss; myData.military = Math.floor(myData.military*0.7);
-            alert(`敗北... 賠償金 $${loss.toLocaleString()} を支払いました`);
-            db.nations[myName]=myData; await saveDB(db); refreshUI();
-        }
-    }
-
-    // --- Admin System (Secure) ---
-    async function attemptAdminLogin() {
-        const input = document.getElementById('adminKey').value;
-        const hash = await sha256(input);
-        
-        // ハッシュ値同士を比較 (パスワード直書き防止)
-        if(hash === ADMIN_HASH) {
-            localStorage.setItem('adminSession', 'active');
-            document.getElementById('overlayAdminAuth').classList.add('hidden');
-            document.getElementById('adminPanel').classList.remove('hidden');
-            refreshAdminList();
-        } else {
-            alert("Password Incorrect");
-        }
-    }
-    function closeAdmin() { document.getElementById('adminPanel').classList.add('hidden'); }
-    function adminLogout() { localStorage.removeItem('adminSession'); location.reload(); }
-
-    async function refreshAdminList() {
-        const t = document.getElementById('adminTableBody'); t.innerHTML = "Loading...";
-        const db = await getDB(); t.innerHTML = "";
-        Object.keys(db.nations||{}).forEach(k => {
-            const n = db.nations[k];
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${k}</td><td>(Encrypted)</td><td>${n.money.toLocaleString()}</td><td>${n.area}</td>
-            <td><button class="btn-war" style="padding:5px;width:auto;" onclick="del('${k}')">DEL</button></td>`;
-            t.appendChild(tr);
-        });
-    }
-    async function del(name) {
-        if(confirm("Delete " + name + "?")) {
-            const db=await getDB(); delete db.nations[name]; await saveDB(db); refreshAdminList();
-        }
-    }
+  }
 </script>
 </body>
 </html>
