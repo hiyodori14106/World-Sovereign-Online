@@ -59,13 +59,22 @@
 </div><script>
   const PANTRY_ID = "6ac44d17-1f5d-4931-a51f-9a540cca1ef7";
   const BASKET_NAME = "strategy_complete_final";
-  const API_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/${BASKET_NAME}`;
+  const API_URL = `https://getpantry.cloud/apiv1/pantry/${}/basket/${}`;
 
   let myName = "", myData = {}, map, drawnItems, drawControl, selectedTarget = null, expansionMode = false;
+  let lastWorldDataStr = ""; // 変更検知用
+  let isSyncing = false; // 通信中フラグ
 
   window.onload = function() {
     const savedName = localStorage.getItem('autoName'), savedPass = localStorage.getItem('autoPass');
     if(savedName && savedPass) login(savedName, savedPass);
+    
+    // Liveインジケーター作成
+    const liveInd = document.createElement('div');
+    liveInd.id = 'liveIndicator';
+    liveInd.style.cssText = "position:absolute; top:10px; left:60px; color:#00ff99; font-size:0.8em; z-index:9999; text-shadow:0 0 5px #00ff99; display:none;";
+    liveInd.innerHTML = "● LIVE SYNC";
+    document.body.appendChild(liveInd);
   };
 
   document.addEventListener('keydown', (e) => {
@@ -79,15 +88,76 @@
   function showScreen(id) { ['Main','Register','Login'].forEach(n => document.getElementById('menu'+n).classList.add('hidden')); document.getElementById('menu'+id).classList.remove('hidden'); }
   function setTab(id) { document.querySelectorAll('[id^="tab-"]').forEach(e => e.classList.add('hidden')); document.getElementById('tab-'+id).classList.remove('hidden'); document.querySelectorAll('.tab').forEach(e => e.classList.remove('active')); event.target.classList.add('active'); if(id === 'rank') updateRanking(); if(id === 'flag') initFlagEditor(); }
 
-  async function getDB() { try { const r = await fetch(API_URL); if(r.ok) return await r.json(); } catch(e){} return { nations: {} }; }
-  async function saveDB(f) { await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(f) }); }
+  // --- 通信関連 (Real-time Core) ---
+  async function getDB() { try { const r = await fetch(API_URL + "?t=" + new Date().getTime()); if(r.ok) return await r.json(); } catch(e){} return { nations: {} }; }
+  
+  // 安全な保存（競合回避：最新データを取得してからマージして保存）
+  async function saveDBsafe(newData) {
+    if(isSyncing) return; // 重複送信防止
+    isSyncing = true; updateLiveStatus(true);
+    try {
+      const db = await getDB();
+      // 自分のデータを最新のDBにマージ
+      db.nations[myName] = newData;
+      await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(db) });
+      myData = newData; // ローカル更新
+    } catch(e) { console.error(e); }
+    isSyncing = false; updateLiveStatus(false);
+    syncWorld(); // 保存後即座に反映
+  }
+
+  // リアルタイムループ
+  function startRealTimeSync() {
+    document.getElementById('liveIndicator').style.display = 'block';
+    setInterval(syncWorld, 2000); // 2秒ごとに同期
+    setInterval(ecoTick, 5000);   // 5秒ごとに内政
+  }
+
+  function updateLiveStatus(sending) {
+    const el = document.getElementById('liveIndicator');
+    el.style.color = sending ? "#ff0055" : "#00ff99";
+    el.innerHTML = sending ? "▲ SENDING..." : "● LIVE SYNC";
+  }
+
+  async function syncWorld() {
+    if(isSyncing) return;
+    const db = await getDB();
+    if(!db.nations) return;
+
+    // データが変更された場合のみマップを再描画（チラつき防止）
+    const currentDataStr = JSON.stringify(db.nations);
+    if(currentDataStr !== lastWorldDataStr) {
+      renderWorld(db.nations);
+      lastWorldDataStr = currentDataStr;
+      
+      // 自分の最新ステータスがサーバーにあれば同期（ただし操作中は除く）
+      if(db.nations[myName] && !expansionMode) {
+        // 資金などはローカル計算を優先したいが、戦争被害などはサーバー優先
+        const serverMe = db.nations[myName];
+        // 面積や戦争状態はサーバー正
+        myData.area = serverMe.area;
+        myData.geometries = serverMe.geometries;
+        myData.warTarget = serverMe.warTarget;
+        myData.requests = serverMe.requests;
+        myData.allies = serverMe.allies;
+        // 資金は同期ズレを防ぐため、大きく減っていたら（攻撃されたら）同期
+        if(serverMe.money < myData.money - 5000) myData.money = serverMe.money; 
+      }
+      refreshUI();
+      if(document.getElementById('tab-rank').classList.contains('hidden') === false) updateRanking(db);
+    }
+  }
+
+  // --- アプリロジック ---
 
   async function register() {
     const n = document.getElementById('regName').value, p = document.getElementById('regPass').value;
     if(!n || !p) return alert("入力不足");
     const db = await getDB(); if(db.nations && db.nations[n]) return alert("既に使用されています");
-    db.nations[n] = { pass: p, money: 20000000, gdp: 5000, military: 500, area: 0, geometries: [], allies: [], requests: [], warTarget: null, flag: null };
-    await saveDB(db); alert("建国完了"); showScreen('Login');
+    const newNation = { pass: p, money: 20000000, gdp: 5000, military: 500, area: 0, geometries: [], allies: [], requests: [], warTarget: null, flag: null };
+    db.nations[n] = newNation;
+    await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(db) });
+    alert("建国完了"); showScreen('Login');
   }
 
   async function login(an, ap) {
@@ -97,15 +167,21 @@
     if(!target || target.pass !== p) { if(!an) alert("認証失敗"); return; }
     localStorage.setItem('autoName', n); localStorage.setItem('autoPass', p);
     myName = n; myData = target;
-    if(!myData.geometries) myData.geometries = []; if(!myData.allies) myData.allies = []; if(!myData.requests) myData.requests = [];
-    document.getElementById('overlayStart').classList.add('hidden'); document.getElementById('gameUI').classList.remove('hidden');
-    initMap(); renderWorld(db.nations); refreshUI(); setInterval(ecoTick, 5000);
+    // データ補正
+    if(!myData.geometries) myData.geometries = []; 
+    if(!myData.allies) myData.allies = []; 
+    if(!myData.requests) myData.requests = [];
+    
+    document.getElementById('overlayStart').classList.add('hidden'); 
+    document.getElementById('gameUI').classList.remove('hidden');
+    initMap(); 
+    startRealTimeSync(); // 同期開始
   }
 
   function initMap() {
     if(map) return;
     map = L.map('gameMap').setView([35, 135], 4);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+    L.tileLayer('https://{}.basemaps.cartocdn.com/dark_all/{}/{}/{}{}.png').addTo(map);
     drawnItems = new L.FeatureGroup(); map.addLayer(drawnItems);
     map.on('popupopen', e => {
       const div = document.createElement('div'); div.innerHTML = e.popup.getContent();
@@ -122,39 +198,50 @@
       const fImg = n.flag ? `<img src="${n.flag}" class="pop-flag">` : "";
       (n.geometries || []).forEach(geo => {
         L.geoJSON(geo, { style: { color: color, weight: 2, fillOpacity: 0.3 } })
-        .bindPopup(`${fImg}<div style="text-align:center;"><b>${key}</b><br>軍事: ${n.military}</div>`).addTo(drawnItems);
+        .bindPopup(`<div style="text-align:center;">${}<b>${}</b><br>軍事: ${n.military}</div>`).addTo(drawnItems);
       });
     });
   }
 
-  // --- 領土購入 (自動合成ロジック) ---
+  // --- 領土購入 ---
   function startExpansion() {
     expansionMode = true; document.getElementById('mapMsg').style.display = 'block';
     if(drawControl) map.removeControl(drawControl);
-    drawControl = new L.Control.Draw({ draw: { polygon: { allowIntersection: false }, rectangle:true }, edit: false });
+    drawControl = new L.Control.Draw({ draw: { polygon: { allowIntersection: false }, rectangle:true, circle:false, marker:false, polyline:false }, edit: false });
     map.addControl(drawControl);
+    
+    map.off(L.Draw.Event.CREATED); // 重複登録防止
     map.on(L.Draw.Event.CREATED, async e => {
       if(!expansionMode) return;
-      const newGeo = e.layer.toGeoJSON(); const db = await getDB();
+      const newGeo = e.layer.toGeoJSON(); 
+      const db = await getDB(); // 最新チェック
       let overlap = false;
       Object.keys(db.nations).forEach(k => { if(k !== myName) (db.nations[k].geometries || []).forEach(g => { if(turf.intersect(newGeo, g)) overlap = true; }); });
-      if(overlap) return alert("他国領土と重複しています");
+      if(overlap) { alert("他国領土と重複しています"); return; }
+      
       const a = Math.round(L.GeometryUtil.geodesicArea(e.layer.getLatLngs()[0])/1000000);
       const cost = myData.area === 0 ? 0 : a * 100;
+      
       if(myData.money >= cost && confirm(`費用 $${cost.toLocaleString()} で購入しますか？`)) {
         let current = [...myData.geometries, newGeo];
         try { let m = current[0]; for(let i=1; i<current.length; i++){ let r = turf.union(m, current[i]); if(r) m = r; } myData.geometries = [m]; }
         catch(err) { myData.geometries = current; }
-        myData.money -= cost; myData.area = 0; myData.geometries.forEach(g => { myData.area += Math.round(turf.area(g)/1000000); });
-        db.nations[myName] = myData; await saveDB(db); location.reload();
+        
+        myData.money -= cost; 
+        myData.area = 0; myData.geometries.forEach(g => { myData.area += Math.round(turf.area(g)/1000000); });
+        
+        await saveDBsafe(myData); // リロードなし保存
+        alert("購入完了");
       }
       expansionMode = false; document.getElementById('mapMsg').style.display = 'none';
+      if(drawControl) map.removeControl(drawControl);
     });
   }
 
-  // --- ランキング ---
-  async function updateRanking() {
-    const db = await getDB();
+  // --- UI & ランキング ---
+  async function updateRanking(dbParam) {
+    const db = dbParam || await getDB();
+    if(!db.nations) return;
     const ranks = Object.keys(db.nations).map(k => {
       const n = db.nations[k]; const s = Math.floor(n.gdp + (n.military * 10) + (n.area / 100));
       return { name: k, score: s };
@@ -171,64 +258,127 @@
     document.getElementById('uiName').innerText = myName;
     document.getElementById('btnWar').style.display = myData.warTarget ? 'none' : 'block';
     document.getElementById('warAutoMsg').style.display = myData.warTarget ? 'block' : 'none';
-    const rb = document.getElementById('requestBox'); rb.innerHTML = (myData.requests && myData.requests.length > 0) ? "" : "申請なし";
-    (myData.requests || []).forEach(s => { rb.innerHTML += `<div>${s} <button class="admin-edit-btn" onclick="acceptRequest('${s}')">承諾</button></div>`; });
+    
+    const rb = document.getElementById('requestBox'); 
+    let reqHtml = (myData.requests && myData.requests.length > 0) ? "" : "申請なし";
+    (myData.requests || []).forEach(s => { reqHtml += `<div>${} <button class="admin-edit-btn" onclick="acceptRequest('${}')">承諾</button></div>`; });
+    rb.innerHTML = reqHtml;
   }
 
-  // --- 自動経済 & 自動戦争 ---
+  // --- ゲームループ ---
   async function ecoTick() { 
+    if(!myData.gdp) return;
+    // 内政計算
     myData.money += myData.gdp * (parseInt(document.getElementById('taxRate').value)/100); 
     if(myData.warTarget) await autoWarProcess();
     refreshUI(); 
+    // 定期保存はしない（通信量節約のため、重要な変更時のみsaveDBsafeを呼ぶか、非常に長い間隔で行う）
   }
 
   async function autoWarProcess() {
-    const db = await getDB(), enName = myData.warTarget, en = db.nations[enName];
+    const db = await getDB();
+    const enName = myData.warTarget;
+    let en = db.nations[enName];
+    
     if(!en) { myData.warTarget = null; return; }
+    
+    // 戦闘処理
     if(myData.military * (0.6 + Math.random()) > en.military * (0.6 + Math.random())) {
-      // 勝利：ステータスと領土の吸収
-      const sA = Math.floor(en.area * 0.1), sG = Math.floor(en.gdp * 0.1);
-      en.area -= sA; myData.area += sA; en.gdp -= sG; myData.gdp += sG;
-      if(en.geometries.length > 0) { 
-        myData.geometries.push(en.geometries.pop()); 
+       // 勝利
+       const sA = Math.floor(en.area * 0.1), sG = Math.floor(en.gdp * 0.1);
+       en.area -= sA; myData.area += sA; en.gdp -= sG; myData.gdp += sG;
+       
+       if(en.geometries.length > 0) { 
+        // 敵の領土を一つ奪う
+        const stolen = en.geometries.pop();
+        myData.geometries.push(stolen); 
+        // 自分の領土とマージ
         try { let m = myData.geometries[0]; for(let i=1; i<myData.geometries.length; i++){ let r = turf.union(m, myData.geometries[i]); if(r) m = r; } myData.geometries = [m]; } catch(e){}
-      }
-      myData.military = Math.max(0, myData.military - 50); en.military = Math.max(0, en.military - 100);
-      if(en.area <= 50 || en.military <= 0) {
-        alert(`${enName}を併合！`); myData.area += en.area; myData.geometries.push(...en.geometries);
-        delete db.nations[enName]; myData.warTarget = null; await saveDB(db); location.reload(); return;
-      }
-    } else { myData.military = Math.max(0, myData.military - 100); }
-    db.nations[myName] = myData; db.nations[enName] = en; await saveDB(db); renderWorld(db.nations);
+       }
+       
+       myData.military = Math.max(0, myData.military - 50); 
+       en.military = Math.max(0, en.military - 100);
+       
+       if(en.area <= 50 || en.military <= 0) {
+        alert(`${} を併合！`); 
+        myData.area += en.area; 
+        myData.geometries.push(...en.geometries);
+        delete db.nations[enName]; 
+        myData.warTarget = null; 
+       } else {
+         db.nations[enName] = en; // 敵の更新
+       }
+    } else { 
+      myData.military = Math.max(0, myData.military - 100); 
+    }
+    
+    // 両方のデータを更新して保存
+    db.nations[myName] = myData; 
+    await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(db) });
+    syncWorld();
   }
 
-  function invest() { if(myData.money>=2000){myData.money-=2000; myData.gdp+=500; refreshUI();} }
-  function recruit() { if(myData.money>=1000){myData.money-=1000; myData.military+=250; refreshUI();} }
-  async function manualSave() { const db=await getDB(); db.nations[myName]=myData; await saveDB(db); alert("保存完了"); }
+  // --- アクション ---
+  function invest() { if(myData.money>=2000){myData.money-=2000; myData.gdp+=500; refreshUI(); saveDBsafe(myData);} }
+  function recruit() { if(myData.money>=1000){myData.money-=1000; myData.military+=250; refreshUI(); saveDBsafe(myData);} }
+  function manualSave() { saveDBsafe(myData); alert("サーバー保存完了"); }
   function doLogout() { localStorage.clear(); location.reload(); }
 
   function selectTarget(n) { selectedTarget = n; document.getElementById('targetName').innerText = n; document.getElementById('btnAlly').disabled = false; document.getElementById('btnWar').disabled = false; }
-  async function actionAlly() { const db = await getDB(); if(!db.nations[selectedTarget].requests) db.nations[selectedTarget].requests = []; db.nations[selectedTarget].requests.push(myName); await saveDB(db); alert("申請完了"); }
-  async function acceptRequest(s) { const db = await getDB(); myData.requests = myData.requests.filter(r => r !== s); myData.allies.push(s); db.nations[s].allies.push(myName); db.nations[myName] = myData; await saveDB(db); location.reload(); }
-  async function actionWar() { if(confirm(`${selectedTarget} に宣戦布告？`)){ myData.warTarget = selectedTarget; const db = await getDB(); db.nations[myName] = myData; await saveDB(db); location.reload(); } }
   
+  async function actionAlly() { 
+    if(!selectedTarget) return;
+    const db = await getDB(); 
+    if(!db.nations[selectedTarget].requests) db.nations[selectedTarget].requests = []; 
+    if(!db.nations[selectedTarget].requests.includes(myName)) {
+      db.nations[selectedTarget].requests.push(myName); 
+      await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(db) });
+      alert("申請送信");
+    }
+  }
+  
+  async function acceptRequest(s) { 
+    myData.requests = myData.requests.filter(r => r !== s); 
+    myData.allies.push(s); 
+    
+    const db = await getDB();
+    if(db.nations[s]) {
+      if(!db.nations[s].allies) db.nations[s].allies = [];
+      db.nations[s].allies.push(myName);
+      db.nations[myName] = myData; // 自分も更新
+      await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(db) });
+      refreshUI();
+      syncWorld();
+      alert(`同盟成立: ${}`);
+    }
+  }
+  
+  async function actionWar() { 
+    if(confirm(`${} に宣戦布告？`)){ 
+      myData.warTarget = selectedTarget; 
+      saveDBsafe(myData);
+    } 
+  }
+  
+  // --- Admin ---
   function attemptAdminLogin() { if(document.getElementById('adminKey').value === "201305042020302") { localStorage.setItem('adminSession', 'active'); document.getElementById('adminPanel').classList.remove('hidden'); refreshAdminList(); } }
   function closeAdmin() { document.getElementById('adminPanel').classList.add('hidden'); }
   async function refreshAdminList() {
     const t = document.getElementById('adminTableBody'); t.innerHTML = ""; const db = await getDB();
+    if(!db.nations) return;
     Object.keys(db.nations).forEach(k => {
       const n = db.nations[k];
-      t.innerHTML += `<tr><td>${k}</td>
-      <td>${n.pass} <button class="admin-edit-btn" onclick="adminEdit('${k}','pass','${n.pass}')">変</button></td>
-      <td>${n.money} <button class="admin-edit-btn" onclick="adminEdit('${k}','money',${n.money})">変</button></td>
-      <td>${n.area} <button class="admin-edit-btn" onclick="adminEdit('${k}','area',${n.area})">変</button></td>
-      <td>${n.gdp} <button class="admin-edit-btn" onclick="adminEdit('${k}','gdp',${n.gdp})">変</button></td>
-      <td>${n.military} <button class="admin-edit-btn" onclick="adminEdit('${k}','military',${n.military})">変</button></td>
-      <td><button onclick="del('${k}')" style="background:red; color:white;">消</button></td></tr>`;
+      t.innerHTML += `<tr><td>${}</td>
+      <td>${n.pass} <button class="admin-edit-btn" onclick="adminEdit('${}','pass','${n.pass}')">変</button></td>
+      <td>${n.money} <button class="admin-edit-btn" onclick="adminEdit('${}','money',${n.money})">変</button></td>
+      <td>${n.area} <button class="admin-edit-btn" onclick="adminEdit('${}','area',${n.area})">変</button></td>
+      <td>${n.gdp} <button class="admin-edit-btn" onclick="adminEdit('${}','gdp',${n.gdp})">変</button></td>
+      <td>${n.military} <button class="admin-edit-btn" onclick="adminEdit('${}','military',${n.military})">変</button></td>
+      <td><button onclick="del('${}')" style="background:red; color:white;">消</button></td></tr>`;
     });
   }
-  async function adminEdit(c,k,v){ let n=prompt("変更後",v); if(n!==null){ const db=await getDB(); db.nations[c][k]=(k==='pass'?n:Number(n)); await saveDB(db); refreshAdminList(); }}
-  async function del(n){ if(confirm("削除？")){ const db=await getDB(); delete db.nations[n]; await saveDB(db); refreshAdminList(); }}
+  async function adminEdit(c,k,v){ let n=prompt("変更後",v); if(n!==null){ const db=await getDB(); db.nations[c][k]=(k==='pass'?n:Number(n)); await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(db) }); refreshAdminList(); }}
+  async function del(n){ if(confirm("削除？")){ const db=await getDB(); delete db.nations[n]; await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(db) }); refreshAdminList(); }}
 
   // --- 国旗 ---
   let flagCtx, fCur="#fff", fDraw=false;
@@ -241,5 +391,5 @@
   }
   function drawF(e) { const r=document.getElementById('flagCanvas').getBoundingClientRect(); flagCtx.fillStyle=fCur; flagCtx.fillRect(Math.floor((e.clientX-r.left)/10)*10, Math.floor((e.clientY-r.top)/10)*10, 10, 10); }
   function clearFlag() { flagCtx.fillStyle="#fff"; flagCtx.fillRect(0,0,100,60); }
-  async function saveFlag() { myData.flag = document.getElementById('flagCanvas').toDataURL(); manualSave(); }
+  async function saveFlag() { myData.flag = document.getElementById('flagCanvas').toDataURL(); saveDBsafe(myData); alert("国旗保存"); }
 </script></body> </html>
