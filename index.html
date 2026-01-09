@@ -20,6 +20,7 @@
     .rank-score { font-family: 'Orbitron'; color: var(--neon-blue); }
     button { width: 100%; padding: 10px; margin-bottom: 5px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-family: 'Noto Sans JP'; transition: 0.2s; }
     button:hover { filter: brightness(1.2); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-main { background: var(--neon-blue); color: black; }
     .btn-war { background: var(--neon-red); color: white; }
     .btn-buy { background: var(--neon-green); color: black; }
@@ -35,9 +36,9 @@
     table { width: 100%; border-collapse: collapse; margin-top: 10px; color: #ccc; font-size: 0.85em; }
     th, td { border: 1px solid #333; padding: 8px; text-align: center; }
   </style>
-</head> <body><div id="overlayStart" class="overlay">  <div id="menuMain" class="modal">    <h1>Global Strategy</h1>    <p id="bootMsg" style="color:var(--neon-green);">データ読み込み中...</p>    <div id="menuBtns" class="hidden">      <button class="btn-main" onclick="showScreen('Register')">🌍 新規建国</button>      <button class="btn-buy" onclick="showScreen('Login')">🔑 ログイン</button>    </div>  </div>
+</head> <body><div id="overlayStart" class="overlay">  <div id="menuMain" class="modal">    <h1>Global Strategy</h1>    <p id="bootMsg" style="color:var(--neon-gold);">システム起動中...</p>    <div id="menuBtns">      <button class="btn-main" onclick="showScreen('Register')">🌍 新規建国</button>      <button class="btn-buy" onclick="showScreen('Login')">🔑 ログイン</button>    </div>  </div>
   <div id="menuRegister" class="modal hidden">    <h2>新規建国</h2> <input type="text" id="regName" placeholder="国名"> <input type="password" id="regPass" placeholder="パスワード"> <button class="btn-main" onclick="register()">作成</button> <button class="btn-sub" onclick="showScreen('Main')">戻る</button> </div>
-  <div id="menuLogin" class="modal hidden">    <h2>ログイン</h2> <input type="text" id="loginName" placeholder="国名"> <input type="password" id="loginPass" placeholder="パスワード"> <button class="btn-buy" onclick="login()">入国</button> <button class="btn-sub" onclick="showScreen('Main')">戻る</button> </div>
+  <div id="menuLogin" class="modal hidden">    <h2>ログイン</h2> <input type="text" id="loginName" placeholder="国名"> <input type="password" id="loginPass" placeholder="パスワード"> <button class="btn-buy" id="loginSubmitBtn" onclick="login()">入国</button> <button class="btn-sub" onclick="showScreen('Main')">戻る</button> </div>
 </div><div id="overlayAdminAuth" class="overlay hidden"> <div class="modal"> <h2>管理者</h2> <input type="password" id="adminKey"> <button class="btn-war" onclick="attemptAdminLogin()">認証</button> </div> </div><div id="adminPanel" class="hidden"> <h2>⚠️ 管理パネル</h2> <button class="btn-sub" onclick="closeAdmin()">閉</button> <table id="adminTable"></table> </div><div id="gameUI" class="app-container hidden">  <div class="map-section"> <div id="gameMap"></div> <div id="mapMsg" style="position:absolute; top:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.9); padding:15px; border:2px solid var(--neon-gold); color:var(--neon-gold); display:none; z-index:1000;"><b>【領土描画モード】陸地に自動吸着します</b></div> </div>
   <div class="sidebar">    <h1><span id="uiName">NATION</span></h1>    <div class="stats-grid">
       <div class="stat-card"><span class="stat-label">資金</span><span class="stat-val" id="valMoney">0</span></div>
@@ -46,8 +47,8 @@
       <div class="stat-card"><span class="stat-label">軍事力</span><span class="stat-val" id="valMil">0</span></div>
     </div>
     <div class="tabs"> <div class="tab active" onclick="setTab('main')">内政</div> <div class="tab" onclick="setTab('war')">軍事</div> <div class="tab" onclick="setTab('rank')">順位</div> </div>
-    <div id="tab-main"> <h3>経済</h3> <button class="btn-main" onclick="invest()">🏭 産業投資</button> <h3>領土</h3> <button class="btn-buy" onclick="startExpansion()">🗺️ 領土購入</button> <button class="btn-sub" onclick="manualSave()">💾 保存</button> <button class="btn-sub" onclick="doLogout()">🚪 終了</button> </div>
-    <div id="tab-war" class="hidden"> <h3>軍事</h3> <button class="btn-war" onclick="recruit()">⚔️ 雇用</button> <h3>外交</h3> <div id="targetBox" class="stat-card" style="text-align:left;">対象: <b id="targetName">なし</b><br>状態: <span id="targetStatus">---</span></div> <button class="btn-buy" id="btnAlly" onclick="actionAlly()" disabled>🤝 同盟申請</button> <button class="btn-war" id="btnWar" onclick="actionWar()" disabled>💣 宣戦布告</button> <button class="btn-war" id="btnAttack" onclick="actionAttack()" style="background:orange; display:none;">🔥 攻撃</button> </div>
+    <div id="tab-main"> <h3>経済</h3> <button class="btn-main" onclick="invest()">🏭 産業投資 (-$2000)</button> <h3>領土</h3> <button class="btn-buy" id="expansionBtn" onclick="startExpansion()">🗺️ 領土購入</button> <button class="btn-sub" onclick="manualSave()">💾 保存</button> <button class="btn-sub" onclick="doLogout()">🚪 終了</button> </div>
+    <div id="tab-war" class="hidden"> <h3>軍備</h3> <button class="btn-war" onclick="recruit()">⚔️ 兵士雇用 (-$1000)</button> <h3>外交</h3> <div id="targetBox" class="stat-card" style="text-align:left;">対象: <b id="targetName">なし</b><br>状態: <span id="targetStatus">---</span></div> <button class="btn-buy" id="btnAlly" onclick="actionAlly()" disabled>🤝 同盟申請</button> <button class="btn-war" id="btnWar" onclick="actionWar()" disabled>💣 宣戦布告</button> <button class="btn-war" id="btnAttack" onclick="actionAttack()" style="background:orange; display:none;">🔥 攻撃開始！</button> </div>
     <div id="tab-rank" class="hidden"> <h3>国力ランキング</h3> <div id="rankingList"></div> </div>
     <div style="margin-top:auto; font-size:0.7em; color:#555; text-align:center;">Shift+Alt: Admin</div>
   </div>
@@ -57,17 +58,20 @@
   const API_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/${BASKET_NAME}`;
 
   let myName = "", myData = {}, map, drawnItems, drawControl, selectedTarget = null, expansionMode = false;
-  let worldLand = null; // 陸地データ
+  let worldLand = null;
 
   window.onload = async function() {
-    // 陸地GeoJSONをロード（軽量版）
+    // 地図データ読み込み
     try {
       const res = await fetch('https://raw.githubusercontent.com/datasets/geo-boundaries-world-110m/master/countries.geojson');
       worldLand = await res.json();
-      document.getElementById('bootMsg').innerText = "システム起動準備完了";
-      document.getElementById('menuBtns').classList.remove('hidden');
-    } catch(e) { alert("地図データの取得に失敗しました"); }
+      document.getElementById('bootMsg').innerText = "システム稼働中";
+    } catch(e) { 
+      document.getElementById('bootMsg').innerText = "地図読込失敗(陸地吸着不可)";
+      console.error(e); 
+    }
     
+    // 自動ログイン
     const savedName = localStorage.getItem('autoName'), savedPass = localStorage.getItem('autoPass');
     if(savedName && savedPass) login(savedName, savedPass);
   };
@@ -82,15 +86,45 @@
 
   async function register() {
     const n = document.getElementById('regName').value, p = document.getElementById('regPass').value;
-    const db = await getDB(); if(db.nations[n]) return alert("重複");
+    if(!n || !p) return alert("入力してください");
+    const db = await getDB(); if(db.nations && db.nations[n]) return alert("その国名は既にあります");
+    if(!db.nations) db.nations = {};
     db.nations[n] = { pass: p, money: 20000000, gdp: 5000, military: 500, area: 0, geometries: [], allies: [], requests: [], warTarget: null };
-    await saveDB(db); showScreen('Login');
+    await saveDB(db); alert("建国成功！"); showScreen('Login');
   }
 
-  async function login(name, pass) {
-    const db = await getDB(); const n = db.nations[name]; if(!n || n.pass !== pass) return;
-    localStorage.setItem('autoName', name); localStorage.setItem('autoPass', pass);
-    myName = name; myData = n;
+  // --- ログイン機能 (不具合修正) ---
+  async function login(autoN, autoP) {
+    const n = autoN || document.getElementById('loginName').value;
+    const p = autoP || document.getElementById('loginPass').value;
+    if(!n || !p) return;
+    
+    const btn = document.getElementById('loginSubmitBtn');
+    if(btn) btn.innerText = "通信中...";
+
+    const db = await getDB();
+    const target = db.nations ? db.nations[n] : null;
+
+    if(!target) {
+      alert("国家が見つかりません。");
+      if(btn) btn.innerText = "入国";
+      return;
+    }
+    if(target.pass !== p) {
+      alert("パスワードが違います。");
+      if(btn) btn.innerText = "入国";
+      return;
+    }
+
+    // 成功
+    localStorage.setItem('autoName', n); localStorage.setItem('autoPass', p);
+    myName = n; myData = target;
+    
+    // データ欠損補完
+    if(!myData.geometries) myData.geometries = [];
+    if(!myData.allies) myData.allies = [];
+    if(!myData.requests) myData.requests = [];
+
     document.getElementById('overlayStart').classList.add('hidden');
     document.getElementById('gameUI').classList.remove('hidden');
     initMap(); renderWorld(db.nations); refreshUI();
@@ -115,13 +149,13 @@
       const n = ns[k], isMe = (k === myName), isAlly = (myData.allies || []).includes(k), isWar = (myData.warTarget === k);
       let col = isMe ? "#00f3ff" : (isWar ? "#ff8800" : (isAlly ? "#00ff99" : "#ff0055"));
       (n.geometries || []).forEach(geo => {
-        L.geoJSON(geo, { style: { color: col, weight: 2, fillOpacity: 0.3 } }).bindPopup(`<b>${k}</b>`).addTo(drawnItems);
+        L.geoJSON(geo, { style: { color: col, weight: 2, fillOpacity: 0.3 } }).bindPopup(`<b>${k}</b><br>軍事: ${n.military}`).addTo(drawnItems);
       });
     });
   }
 
-  // --- 陸地スナッピング付 領土購入 ---
   function startExpansion() {
+    if(!worldLand) return alert("地図データの準備ができていません。しばらくお待ちください。");
     expansionMode = true; document.getElementById('mapMsg').style.display = 'block';
     if(drawControl) map.removeControl(drawControl);
     drawControl = new L.Control.Draw({ draw: { polygon: { allowIntersection: false }, rectangle:true }, edit: false });
@@ -131,38 +165,30 @@
       const drawGeo = e.layer.toGeoJSON();
       const db = await getDB();
       
-      // 陸地との交差判定（海を削る）
       let clippedGeo = null;
       worldLand.features.forEach(land => {
         try {
           const inter = turf.intersect(drawGeo, land);
-          if(inter) {
-            if(!clippedGeo) clippedGeo = inter;
-            else clippedGeo = turf.union(clippedGeo, inter);
-          }
+          if(inter) clippedGeo = clippedGeo ? turf.union(clippedGeo, inter) : inter;
         } catch(err){}
       });
 
-      if(!clippedGeo || turf.area(clippedGeo) === 0) { alert("陸地が選択されていません。"); map.removeLayer(e.layer); return; }
+      if(!clippedGeo) { alert("陸地を描いてください"); map.removeLayer(e.layer); return; }
 
-      // 他国重複チェック
       let overlap = false;
       Object.keys(db.nations).forEach(k => { if(k !== myName) (db.nations[k].geometries || []).forEach(g => { if(turf.intersect(clippedGeo, g)) overlap = true; }); });
-      if(overlap) return alert("他国領土と重複しています");
+      if(overlap) return alert("他国と重複しています");
 
       const a = Math.round(turf.area(clippedGeo)/1000000);
       const cost = myData.area === 0 ? 0 : a * 100;
 
-      if(myData.money >= cost && confirm(`陸地 ${a.toLocaleString()}km² を購入しますか？`)) {
-        let currentGeos = Array.isArray(myData.geometries) ? [...myData.geometries, clippedGeo] : [clippedGeo];
+      if(myData.money >= cost && confirm(`購入: ${a}km² / 費用: $${cost}`)) {
+        let current = [...myData.geometries, clippedGeo];
         try {
-          let merged = currentGeos[0];
-          for(let i=1; i<currentGeos.length; i++) {
-            let res = turf.union(merged, currentGeos[i]); if(res) merged = res;
-          }
+          let merged = current[0];
+          for(let i=1; i<current.length; i++) { let res = turf.union(merged, current[i]); if(res) merged = res; }
           myData.geometries = [merged];
-        } catch(err) { myData.geometries = currentGeos; }
-
+        } catch(err) { myData.geometries = current; }
         myData.money -= cost;
         myData.area = 0; myData.geometries.forEach(g => { myData.area += Math.round(turf.area(g)/1000000); });
         db.nations[myName] = myData; await saveDB(db); location.reload();
@@ -178,7 +204,7 @@
       return { name: k, score: score };
     }).sort((a, b) => b.score - a.score);
     const list = document.getElementById('rankingList'); list.innerHTML = "";
-    ranks.slice(0, 10).forEach((r, i) => { list.innerHTML += `<div class="rank-item"><span class="rank-num">${i+1}</span><span class="rank-name">${r.name}</span><span class="rank-score">${r.score.toLocaleString()} pt</span></div>`; });
+    ranks.slice(0, 10).forEach((r, i) => { list.innerHTML += `<div class="rank-item"><span class="rank-num">${i+1}</span><span class="rank-name">${r.name}</span><span class="rank-score">${r.score.toLocaleString()}</span></div>`; });
   }
 
   function refreshUI() {
@@ -194,24 +220,21 @@
   function ecoTick() { myData.money += myData.gdp * (parseInt(document.getElementById('taxRate').value)/100); refreshUI(); }
   function invest() { if(myData.money>=2000){myData.money-=2000; myData.gdp+=500; refreshUI();} }
   function recruit() { if(myData.money>=1000){myData.money-=1000; myData.military+=200; refreshUI();} }
-  async function manualSave() { const db=await getDB(); db.nations[myName]=myData; await saveDB(db); alert("保存完了"); }
+  async function manualSave() { const db=await getDB(); db.nations[myName]=myData; await saveDB(db); alert("保存しました"); }
   function doLogout() { localStorage.clear(); location.reload(); }
 
   function selectTarget(n) { selectedTarget = n; document.getElementById('targetName').innerText = n; document.getElementById('btnAlly').disabled = false; document.getElementById('btnWar').disabled = false; }
-  async function actionAlly() { const db = await getDB(); db.nations[selectedTarget].requests.push(myName); await saveDB(db); alert("申請済"); }
-  async function actionWar() { if(confirm("宣戦布告しますか？")){ myData.warTarget = selectedTarget; const db = await getDB(); db.nations[myName] = myData; await saveDB(db); location.reload(); } }
+  async function actionAlly() { const db = await getDB(); db.nations[selectedTarget].requests.push(myName); await saveDB(db); alert("申請完了"); }
+  async function actionWar() { if(confirm("宣戦布告？")){ myData.warTarget = selectedTarget; const db = await getDB(); db.nations[myName] = myData; await saveDB(db); location.reload(); } }
   
   async function actionAttack() {
     const db = await getDB(), en = db.nations[myData.warTarget];
-    if(!en) return;
+    if(!en) return alert("相手がいません");
     if(myData.military * Math.random() > en.military * 0.8 * Math.random()) {
       const sA = Math.floor(en.area * 0.2); en.area -= sA; myData.area += sA;
       myData.military -= Math.floor(en.military * 0.1); en.military -= Math.floor(myData.military * 0.1);
-      alert(`勝利！ 面積 ${sA}km² を奪いました。`);
-      if(en.area < 100) {
-        if(en.geometries) myData.geometries = [...myData.geometries, ...en.geometries];
-        delete db.nations[myData.warTarget]; myData.warTarget = null; alert("完全併合！");
-      }
+      alert(`勝利！ 領土 ${sA}km² 奪取`);
+      if(en.area < 100) { if(en.geometries) myData.geometries = [...myData.geometries, ...en.geometries]; delete db.nations[myData.warTarget]; myData.warTarget = null; alert("併合！"); }
     } else { myData.military -= Math.floor(myData.military * 0.15); alert("敗北..."); }
     db.nations[myName] = myData; if(db.nations[myData.warTarget]) db.nations[myData.warTarget] = en;
     await saveDB(db); refreshUI(); renderWorld(db.nations);
