@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="ja"> <head>  <meta charset="UTF-8">  <meta name="viewport" content="width=device-width, initial-scale=1.0">  <title>Global Strategy: Ultimate Edition</title>  
+<!DOCTYPE html><html lang="ja"> <head>  <meta charset="UTF-8">  <meta name="viewport" content="width=device-width, initial-scale=1.0">  <title>Global Strategy: Final Fix</title>  
   <!-- Fonts -->  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">  
   <!-- Libraries -->  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>  <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
 <style>
@@ -65,13 +65,14 @@
     try {
       const res = await fetch('https://raw.githubusercontent.com/datasets/geo-boundaries-world-110m/master/countries.geojson');
       const data = await res.json();
-      // 全ての陸地を一つのMultiPolygonに統合して判定を高速・確実に
-      landGeom = data.features[0].geometry;
+      // 全陸地を結合
+      let merged = data.features[0].geometry;
       for(let i=1; i<data.features.length; i++) {
-        try { landGeom = turf.union(landGeom, data.features[i].geometry); } catch(e){}
+        try { merged = turf.union(merged, data.features[i].geometry); } catch(e){}
       }
+      landGeom = merged;
       document.getElementById('bootMsg').innerText = "準備完了";
-    } catch(e) { document.getElementById('bootMsg').innerText = "地図取得失敗"; }
+    } catch(e) { document.getElementById('bootMsg').innerText = "地図取得失敗(吸着無効)"; }
     document.getElementById('menuBtns').classList.remove('hidden');
     const sn = localStorage.getItem('autoName'), sp = localStorage.getItem('autoPass');
     if(sn && sp) login(sn, sp);
@@ -109,7 +110,10 @@
     map = L.map('gameMap').setView([35, 135], 3);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
     drawnItems = new L.FeatureGroup(); map.addLayer(drawnItems);
-    map.on('popupopen', e => { const n = e.popup.getContent().match(/<b>(.*?)<\/b>/)[1]; if(n && n !== myName) selectTarget(n); });
+    map.on('popupopen', e => { 
+        const n = e.popup.getContent().match(/<b>(.*?)<\/b>/);
+        if(n && n[1] !== myName) selectTarget(n[1]); 
+    });
   }
 
   function renderWorld(ns) {
@@ -117,50 +121,59 @@
     Object.keys(ns).forEach(k => {
       const n = ns[k], isMe = (k === myName), isAlly = (myData.allies || []).includes(k), isWar = (myData.warTarget === k);
       let col = isMe ? "#00f3ff" : (isWar ? "#ff8800" : (isAlly ? "#00ff99" : "#ff0055"));
-      const fImg = n.flag ? `<img src="${n.flag}" class="pop-flag">` : "";
-      (n.geometries || []).forEach(geo => { L.geoJSON(geo, { style: { color: col, weight: 1, fillOpacity: 0.3 } }).bindPopup(`${fImg}<div style="text-align:center;"><b>${k}</b><br>軍力: ${n.military}</div>`).addTo(drawnItems); });
+      (n.geometries || []).forEach(geo => { L.geoJSON(geo, { style: { color: col, weight: 1.5, fillOpacity: 0.3 } }).bindPopup(`<b>${k}</b><br>軍力: ${n.military}`).addTo(drawnItems); });
     });
   }
 
-  // --- 領土購入 (完全な陸地判定ロジック) ---
+  // --- 領土購入 (完全吸着修正版) ---
   function startExpansion() {
     expansionMode = true; document.getElementById('mapMsg').style.display = 'block';
     if(drawControl) map.removeControl(drawControl);
-    drawControl = new L.Control.Draw({ draw: { polygon: { allowIntersection: false }, rectangle:true }, edit: false });
+    drawControl = new L.Control.Draw({ draw: { polygon: { allowIntersection: false, drawError: { color: '#e1e1e1', message: '重なり禁止' } }, rectangle:true }, edit: false });
     map.addControl(drawControl);
     map.on(L.Draw.Event.CREATED, async e => {
       if(!expansionMode) return;
-      let dGeo = e.layer.toGeoJSON().geometry;
+      let rawGeo = e.layer.toGeoJSON().geometry;
       const db = await getDB();
       
-      // 図形の自己交差などを修正
-      dGeo = turf.buffer(dGeo, 0);
+      // 1. 幾何学的な不整合を修正 (Turf.buffer(0))
+      let dGeo = turf.buffer(rawGeo, 0);
 
-      // 陸地との重なりを計算
+      // 2. 陸地との交差 (Intersection)
       let clipped = null;
       if(landGeom) {
-        try { clipped = turf.intersect(dGeo, landGeom); } catch(err){ console.error(err); }
+        try {
+          clipped = turf.intersect(dGeo, landGeom);
+        } catch(err){ console.error("判定エラー:", err); }
       } else clipped = dGeo;
 
-      if(!clipped || turf.area(clipped) < 1) { alert("陸地がありません。海は買えません。"); map.removeLayer(e.layer); return; }
+      if(!clipped || turf.area(clipped) < 100) { 
+        alert("陸地が認識できません。もっと陸の奥を大きく囲んでください。"); 
+        map.removeLayer(e.layer); return; 
+      }
 
-      // 他国重複
+      // 3. 他国重複チェック
       let overlap = false;
       Object.keys(db.nations).forEach(k => { if(k !== myName) (db.nations[k].geometries || []).forEach(g => { if(turf.intersect(clipped, g)) overlap = true; }); });
-      if(overlap) return alert("他国と重複しています");
+      if(overlap) return alert("他国領土と重複しています");
 
       const a = Math.round(turf.area(clipped)/1000000);
       const cost = myData.area === 0 ? 0 : a * 100;
 
       if(myData.money >= cost && confirm(`購入: ${a.toLocaleString()}km²\n費用: $${cost.toLocaleString()}`)) {
         myData.geometries.push(clipped);
+        // 自分の領土同士を合体
         try {
           if(myData.geometries.length > 1) {
             let m = myData.geometries[0];
-            for(let i=1; i<myData.geometries.length; i++) { let res = turf.union(m, myData.geometries[i]); if(res) m = res; }
+            for(let i=1; i<myData.geometries.length; i++) { 
+                let res = turf.union(m, myData.geometries[i]); 
+                if(res) m = res; 
+            }
             myData.geometries = [m];
           }
         } catch(err){}
+        
         myData.money -= cost;
         myData.area = 0; myData.geometries.forEach(g => { myData.area += Math.round(turf.area(g)/1000000); });
         db.nations[myName] = myData; await saveDB(db); location.reload();
@@ -199,13 +212,13 @@
   async function autoWar() {
     const db = await getDB(), enName = myData.warTarget, en = db.nations[enName];
     if(!en) { myData.warTarget = null; return; }
-    if(myData.military * (0.5 + Math.random()) > en.military * (0.5 + Math.random())) {
+    if(myData.military * (0.6 + Math.random()) > en.military * (0.6 + Math.random())) {
       const sA = Math.floor(en.area * 0.1); en.area -= sA; myData.area += sA;
       en.gdp -= Math.floor(en.gdp * 0.1); myData.gdp += Math.floor(en.gdp * 0.1);
       if(en.geometries.length > 0) { myData.geometries.push(en.geometries.pop()); }
       myData.military = Math.max(0, myData.military - 50); en.military = Math.max(0, en.military - 100);
       if(en.area < 100 || en.military <= 0) {
-        alert(`${enName}を併合しました！`); myData.geometries.push(...en.geometries); delete db.nations[enName]; myData.warTarget = null;
+        alert(`${enName}を制圧！`); myData.geometries.push(...en.geometries); delete db.nations[enName]; myData.warTarget = null;
         await saveDB(db); location.reload(); return;
       }
     } else { myData.military = Math.max(0, myData.military - 120); }
@@ -222,7 +235,7 @@
   async function acceptRequest(s) { const db = await getDB(); myData.requests = myData.requests.filter(r => r !== s); myData.allies.push(s); db.nations[s].allies.push(myName); db.nations[myName] = myData; await saveDB(db); location.reload(); }
   async function actionWar() { if(confirm("宣戦布告？")){ myData.warTarget = selectedTarget; const db = await getDB(); db.nations[myName] = myData; await saveDB(db); location.reload(); } }
   
-  function attemptAdminLogin() { if(document.getElementById('adminKey').value === "201305042020302") { localStorage.setItem('adminSession', 'active'); document.getElementById('overlayAdminAuth').classList.add('hidden'); document.getElementById('adminPanel').classList.remove('hidden'); refreshAdminList(); } }
+  function attemptAdminLogin() { if(document.getElementById('adminKey').value === "201305042020302") { localStorage.setItem('adminSession', 'active'); document.getElementById('adminPanel').classList.remove('hidden'); refreshAdminList(); } }
   function closeAdmin() { document.getElementById('adminPanel').classList.add('hidden'); }
   async function refreshAdminList() {
     const t = document.getElementById('adminTableBody'); t.innerHTML = ""; const db = await getDB();
