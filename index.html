@@ -29,7 +29,7 @@
   #eraserBtn { flex: 1; cursor: pointer; background: white; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
   #eraserBtn.active { background: #333; color: white; border-color: #333; }
    
-  /* 実用的なパレットレイアウト */
+  /* パレットレイアウト */
   .palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-top: 8px; }
   .swatch { aspect-ratio: 1; border-radius: 3px; cursor: pointer; border: 1px solid rgba(0,0,0,0.2); }
   .swatch:hover { transform: scale(1.1); z-index: 10; }
@@ -75,12 +75,11 @@
 
 <script>
  // --- 1. 初期設定 ---
- // 指定されたIDに変更
  const PANTRY_ID = "b1ff8b72-63c0-469d-9bbe-b006c5751552";
  const PANTRY_URL = `https://getpantry.cloud/apiv1/pantry/${}/basket/canvas_pixel_data`;
  const localChannel = new BroadcastChannel('inf_canvas_v15_fix');
   
- // Gun.js (複数リレーで接続確率を最大化)
+ // Gun.js 設定
  const gun = Gun({
   peers: [
    'https://gun-manhattan.herokuapp.com/gun',
@@ -99,14 +98,13 @@
  const canvas = document.getElementById('gameCanvas');
  const ctx = canvas.getContext('2d', { alpha: false });
 
- // --- 2. 新しいカラーパレット (実用的な16色) ---
+ // --- 2. カラーパレット ---
  const paletteColors = [
-  "#000000", "#555555", "#AAAAAA", "#FFFFFF", // モノクロ
-  "#FF0000", "#FF7F00", "#FFFF00", "#00FF00", // 暖色・緑
-  "#00FFFF", "#0000FF", "#8A2BE2", "#FF00FF", // 冷色・紫
-  "#8B4513", "#FFDEAD", "#008080", "#FF1493"  // 茶色・肌色・その他
+  "#000000", "#555555", "#AAAAAA", "#FFFFFF",
+  "#FF0000", "#FF7F00", "#FFFF00", "#00FF00",
+  "#00FFFF", "#0000FF", "#8A2BE2", "#FF00FF",
+  "#8B4513", "#FFDEAD", "#008080", "#FF1493"
  ];
- // 圧縮ロジック
  const encodeCol = c => { if(!c)return null; const i=paletteColors.indexOf(c.toUpperCase()); return i!==-1?i.toString(16):c; };
  const decodeCol = c => { if(!c)return null; if(c.length<=2 && /^[0-9A-Fa-f]+$/.test(c)) return paletteColors[parseInt(c,16)]||c; return c; };
 
@@ -135,17 +133,17 @@
    if(!res.ok) throw new Error("Empty");
    const json = await res.json();
    const pixels = json.pixels || {};
-   let count = 0;
    for(let key in pixels) {
     const [x, y] = key.split('_').map(Number);
     updateLocalPixel(x, y, decodeCol(pixels[key]));
-    count++;
    }
-   document.getElementById('saveStatus').innerText = `Sync OK ($)`;
-  } catch(e) { document.getElementById('saveStatus').innerText = "Ready"; }
+   document.getElementById('saveStatus').innerText = "Sync OK";
+  } catch(e) { 
+   document.getElementById('saveStatus').innerText = "Ready"; 
+  }
  }
  
- // Pantry 保存 (常時保存)
+ // Pantry 保存 (10秒間隔)
  const saveToPantry = async () => {
   document.getElementById('saveStatus').innerText = "Saving...";
   const flatData = {};
@@ -168,7 +166,6 @@
    } catch(e) { document.getElementById('saveStatus').innerText = "Retry"; }
   }
  };
- // 保存間隔を10秒に変更
  setInterval(saveToPantry, 10000);
  window.addEventListener("beforeunload", saveToPantry);
 
@@ -184,16 +181,14 @@
   m.appendChild(div); m.scrollTop = m.scrollHeight;
  }
 
- let gunReceivedData = false; // Gunからデータを受け取ったかフラグ
+ let gunReceivedData = false;
 
  dotsDB.map().on((d, k) => { 
-  // Gunからデータが来たらフラグを立てる
   if(d) gunReceivedData = true;
   const [x,y]=k.split('_').map(Number); 
   if(!isNaN(x)) updateLocalPixel(x,y,decodeCol(d)); 
  });
 
- // 人がいる(Gunが有効)ならPantry読み込みをスキップ、そうでなければPantryからロード
  setTimeout(() => {
   if(!gunReceivedData) {
     loadFromPantry();
@@ -220,7 +215,10 @@
  let lastMouse={x:0,y:0}, brushSize=1;
  let hoverPos=null, otherCursors={};
 
- cursorDB.map().on((d, id) => { if(id!==myId && d && Date.now()-d.t<10000) otherCursors[id]=d; });
+ cursorDB.map().on((d, id) => { 
+  if(id!==myId && d && Date.now()-d.t<10000) otherCursors[id]=d; 
+ });
+ 
  const toScreen=(wx,wy)=>({x:Math.floor((wx-camX)*zoom+canvas.width/2), y:Math.floor((wy-camY)*zoom+canvas.height/2)});
  const toWorld=(sx,sy)=>({wx:Math.floor((sx-canvas.width/2)/zoom+camX), wy:Math.floor((sy-canvas.height/2)/zoom+camY)});
 
@@ -289,32 +287,91 @@
  }
 
  // 入力系
- canvas.onmousedown=e=>{const{wx,wy}=toWorld(e.clientX,e.clientY);if(e.button===0&&!e.shiftKey){isPainting=true;paint(wx,wy);}else{isDragging=true;lastMouse={x:e.clientX,y:e.clientY};canvas.style.cursor="grabbing";}};
- window.onmousemove=e=>{const{wx,wy}=toWorld(e.clientX,e.clientY);hoverPos={wx,wy};document.getElementById('coordDisplay').innerText=`${}, ${}`;if(isPainting)paint(wx,wy);if(isDragging){camX-=(e.clientX-lastMouse.x)/zoom;camY-=(e.clientY-lastMouse.y)/zoom;lastMouse={x:e.clientX,y:e.clientY};}if(Math.random()<0.3)cursorDB.get(myId).put({x:wx,y:wy,n:myName,t:Date.now(),col:document.getElementById('colorPicker').value});};
+ canvas.onmousedown=e=>{
+  const{wx,wy}=toWorld(e.clientX,e.clientY);
+  if(e.button===0&&!e.shiftKey){
+   isPainting=true;paint(wx,wy);
+  }else{
+   isDragging=true;lastMouse={x:e.clientX,y:e.clientY};canvas.style.cursor="grabbing";
+  }
+ };
+ 
+ window.onmousemove=e=>{
+  const{wx,wy}=toWorld(e.clientX,e.clientY);
+  hoverPos={wx,wy};
+  document.getElementById('coordDisplay').innerText=`${}, ${}`;
+  if(isPainting) paint(wx,wy);
+  if(isDragging){
+   camX-=(e.clientX-lastMouse.x)/zoom;
+   camY-=(e.clientY-lastMouse.y)/zoom;
+   lastMouse={x:e.clientX,y:e.clientY};
+  }
+  if(Math.random()<0.3) cursorDB.get(myId).put({x:wx,y:wy,n:myName,t:Date.now(),col:document.getElementById('colorPicker').value});
+ };
+ 
  window.onmouseup=()=>{isPainting=isDragging=false;canvas.style.cursor="crosshair";};
   
  let initDist=0,initZ=20;
- canvas.ontouchstart=e=>{if(e.touches.length===1)canvas.onmousedown({...e.touches[0],button:0,target:canvas});else if(e.touches.length===2){isDragging=false;isPainting=false;initDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);initZ=zoom;}};
- canvas.ontouchmove=e=>{e.preventDefault();if(e.touches.length===1)window.onmousemove(e.touches[0]);else if(e.touches.length===2)zoom=Math.min(Math.max(initZ*(Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY)/initDist),2),100);};
+ canvas.ontouchstart=e=>{
+  if(e.touches.length===1) canvas.onmousedown({...e.touches[0],button:0,target:canvas});
+  else if(e.touches.length===2){
+   isDragging=false;isPainting=false;
+   initDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+   initZ=zoom;
+  }
+ };
+ 
+ canvas.ontouchmove=e=>{
+  e.preventDefault();
+  if(e.touches.length===1) window.onmousemove(e.touches[0]);
+  else if(e.touches.length===2) zoom=Math.min(Math.max(initZ*(Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY)/initDist),2),100);
+ };
+ 
  canvas.ontouchend=window.onmouseup;
- canvas.onwheel=e=>{e.preventDefault();zoom=Math.min(Math.max(zoom*(e.deltaY>0?0.9:1.1),2),100);};
+ canvas.onwheel=e=>{
+  e.preventDefault();
+  zoom=Math.min(Math.max(zoom*(e.deltaY>0?0.9:1.1),2),100);
+ };
 
  // UIイベント
  const pCon=document.getElementById('palette');
- paletteColors.forEach(c=>{const s=document.createElement('div');s.className='swatch';s.style.background=c;s.onclick=()=>{isEraser=false;document.getElementById('eraserBtn').classList.remove('active');document.getElementById('colorPicker').value=c;};pCon.appendChild(s);});
- document.getElementById('eraserBtn').onclick=()=>{isEraser=!isEraser;document.getElementById('eraserBtn').classList.toggle('active',isEraser);};
- document.getElementById('nameInput').onchange=e=>{myName=e.target.value||"名無し";localStorage.setItem('ic_name',myName);};
- document.getElementById('chat-input').onkeypress=e=>{if(e.key==='Enter'&&e.target.value.trim()!==""){const t=e.target.value.substring(0,100);chatDB.get(Date.now()).put({u:myName,t:t});localChannel.postMessage({type:'chat',u:myName,t:t});e.target.value="";}};
+ paletteColors.forEach(c => {
+  const s=document.createElement('div');
+  s.className='swatch';
+  s.style.background=c;
+  s.onclick=()=>{
+   isEraser=false;
+   document.getElementById('eraserBtn').classList.remove('active');
+   document.getElementById('colorPicker').value=c;
+  };
+  pCon.appendChild(s);
+ });
+ 
+ document.getElementById('eraserBtn').onclick=()=>{
+  isEraser=!isEraser;
+  document.getElementById('eraserBtn').classList.toggle('active',isEraser);
+ };
+ 
+ document.getElementById('nameInput').onchange=e=>{
+  myName=e.target.value||"名無し";
+  localStorage.setItem('ic_name',myName);
+ };
+ 
+ document.getElementById('chat-input').onkeypress=e=>{
+  if(e.key==='Enter'&&e.target.value.trim()!==""){
+   const t=e.target.value.substring(0,100);
+   chatDB.get(Date.now()).put({u:myName,t:t});
+   localChannel.postMessage({type:'chat',u:myName,t:t});
+   e.target.value="";
+  }
+ };
 
- // --- 5. 管理者認証 (100%動作保証: Base64反転チェック) ---
+ // --- 5. 管理者認証 (整形済み) ---
  window.addEventListener('keydown', (e) => {
   if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'a') {
    const input = prompt("Admin Password:");
    if (!input) return;
 
-   // パスワード "2020302" を反転すると "2030202"
-   // これをBase64化すると "MjAzMDIwMg=="
-   // この単純な比較により、環境依存エラー（cryptoなど）は絶対に起きません。
    const reversedInput = input.trim().split('').reverse().join('');
    const check = btoa(reversedInput);
 
@@ -344,8 +401,63 @@
  });
 
  let stampData=null;
- window.loadStamp=()=>{const f=document.getElementById('imgInput').files[0];if(!f)return;const r=new FileReader();r.onload=e=>{const img=new Image();img.onload=()=>{const w=parseInt(document.getElementById('imgW').value)||50,h=Math.floor(w*(img.height/img.width));const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d');ctx.drawImage(img,0,0,w,h);const d=ctx.getImageData(0,0,w,h).data;stampData=[];for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*4;if(d[i+3]>128)stampData.push({x,y,hex:"#"+((1<<24)+(d[i]<<16)+(d[i+1]<<8)+d[i+2]).toString(16).slice(1)});}alert("ロード完了。キャンバスをクリックで配置");};img.src=e.target.result;};r.readAsDataURL(f);};
- canvas.onclick=e=>{if(stampData&&!isDragging){const{wx,wy}=toWorld(e.clientX,e.clientY);let idx=0;const loop=()=>{for(let i=0;i<50&&idx<stampData.length;i++,idx++){const p=stampData[idx];dotsDB.get(`${wx+p.x}_${wy+p.y}`).put(encodeCol(p.hex));updateLocalPixel(wx+p.x,wy+p.y,p.hex);localChannel.postMessage({type:'pixel',x:wx+p.x,y:wy+p.y,c:p.hex});}if(idx<stampData.length)requestAnimationFrame(loop);else stampData=null;};loop();}};
+ window.loadStamp = () => {
+  const f = document.getElementById('imgInput').files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+   const img = new Image();
+   img.onload = () => {
+    const w = parseInt(document.getElementById('imgW').value) || 50;
+    const h = Math.floor(w * (img.height / img.width));
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0, w, h);
+    const d = ctx.getImageData(0, 0, w, h).data;
+    stampData = [];
+    for (let y = 0; y < h; y++) {
+     for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (d[i + 3] > 128) {
+       stampData.push({
+        x,
+        y,
+        hex: "#" + ((1 << 24) + (d[i] << 16) + (d[i + 1] << 8) + d[i + 2]).toString(16).slice(1)
+       });
+      }
+     }
+    }
+    alert("ロード完了。キャンバスをクリックで配置");
+   };
+   img.src = e.target.result;
+  };
+  r.readAsDataURL(f);
+ };
+
+ canvas.onclick = e => {
+  if (stampData && !isDragging) {
+   const { wx, wy } = toWorld(e.clientX, e.clientY);
+   let idx = 0;
+   const loop = () => {
+    for (let i = 0; i < 50 && idx < stampData.length; i++, idx++) {
+     const p = stampData[idx];
+     dotsDB.get(`${wx+p.x}_${wy+p.y}`).put(encodeCol(p.hex));
+     updateLocalPixel(wx + p.x, wy + p.y, p.hex);
+     localChannel.postMessage({
+      type: 'pixel',
+      x: wx + p.x,
+      y: wy + p.y,
+      c: p.hex
+     });
+    }
+    if (idx < stampData.length) requestAnimationFrame(loop);
+    else stampData = null;
+   };
+   loop();
+  }
+ };
 
  render();
 </script>
