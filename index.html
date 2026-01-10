@@ -156,7 +156,7 @@
   const PANTRY_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/canvas_pixel_data`;
 
   // BroadcastChannel (タブ間同期)
-  const localChannel = new BroadcastChannel('inf_canvas_sync_v8_secure');
+  const localChannel = new BroadcastChannel('inf_canvas_sync_v9_final');
   
   // Gun.js (インターネット同期)
   const gun = Gun({
@@ -164,7 +164,7 @@
     localStorage: true
   });
   
-  const APP_KEY = 'inf_canvas_v8_pantry_final';
+  const APP_KEY = 'inf_canvas_v9_final';
   const db = gun.get(APP_KEY);
   const dotsDB = db.get('dots');
   const chatDB = db.get('chat');
@@ -362,21 +362,16 @@
 
   document.getElementById('chat-input').onkeypress=e=>{if(e.key==='Enter'&&e.target.value.trim()!==""){const t=e.target.value.substring(0,100);chatDB.get(Date.now()).put({u:myName,t:t});localChannel.postMessage({type:'chat',u:myName,t:t});e.target.value="";}};
 
-  // --- 5. 管理者認証 (Web Crypto API - HTTPS Required for GitHub Pages) ---
-  window.addEventListener('keydown', async (e) => {
+  // --- 5. 管理者認証 (難読化方式: どの環境でも動きます) ---
+  window.addEventListener('keydown', (e) => {
     if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'a') {
       const input = prompt("Password:");
       if (!input) return;
 
-      // SHA-256でハッシュ化して比較 (平文パスワードはコードに存在しない)
-      const encoder = new TextEncoder();
-      const data = encoder.encode(input.trim());
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-      // 正解ハッシュ: d09033... (これは 2020302 のハッシュです)
-      if (hashHex === "d09033320df44654922dc479fc92df4866f7df268685169a1987514fe3064cb4") {
+      // 文字列を反転してBase64化して比較
+      // "2020302" -> "2030202" -> Base64: "MjAzMDIwMg=="
+      const reversed = input.trim().split('').reverse().join('');
+      if (btoa(reversed) === "MjAzMDIwMg==") {
         const m = document.getElementById('admin-mount');
         if(m.innerHTML === "") {
           m.innerHTML = `
