@@ -1,691 +1,283 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Global Strategy: Absolute Final Fix</title>
-  
-  <!-- Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
-  
-  <!-- Libraries -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
-  <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Infinite Canvas Ultimate</title>
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <style>
+        :root { --primary: #007AFF; --bg: #ffffff; --ui-bg: rgba(255, 255, 255, 0.85); --text: #333; --shadow: 0 8px 32px rgba(0,0,0,0.1); }
+        body { margin: 0; overflow: hidden; background: var(--bg); font-family: -apple-system, sans-serif; color: var(--text); touch-action: none; }
+        canvas { display: block; cursor: crosshair; }
 
-<style>
-  :root { --bg-color: #050505; --panel-bg: rgba(15, 20, 25, 0.95); --neon-blue: #00f3ff; --neon-red: #ff0055; --neon-green: #00ff99; --neon-gold: #ffcc00; --neon-purple: #bd00ff; }
-  body { font-family: 'Noto Sans JP', sans-serif; background-color: var(--bg-color); color: #e0e6ed; margin: 0; padding: 0; height: 100vh; overflow: hidden; }
-  .app-container { display: flex; height: 100%; }
-  .map-section { flex: 1; position: relative; }
-  #gameMap { width: 100%; height: 100%; background: #0b0b0b; }
-  .sidebar { width: 360px; min-width: 300px; background: var(--panel-bg); border-left: 1px solid #333; display: flex; flex-direction: column; padding: 15px; box-shadow: -5px 0 20px rgba(0,0,0,0.8); z-index: 100; overflow-y: auto; }
-  h1 { color: var(--neon-blue); text-align: center; font-family: 'Orbitron'; font-size: 1.4em; border-bottom: 2px solid var(--neon-blue); padding-bottom: 10px; margin-top: 0; }
-  h3 { color: var(--neon-gold); font-size: 0.9em; margin-top: 15px; border-left: 3px solid var(--neon-gold); padding-left: 8px; font-family: 'Orbitron'; }
-  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
-  .stat-card { background: #1a1a1a; padding: 8px; border-radius: 4px; text-align: center; border: 1px solid #333; position: relative; }
-  .stat-val { font-family: 'Orbitron'; font-size: 1.1em; color: white; display: block; }
-  .stat-label { font-size: 0.7em; color: #888; }
-  .res-icon { color: var(--neon-purple); font-weight: bold; }
-  button { width: 100%; padding: 10px; margin-bottom: 5px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-family: 'Noto Sans JP'; transition: 0.2s; }
-  button:hover { filter: brightness(1.2); }
-  button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
-  .btn-main { background: var(--neon-blue); color: black; }
-  .btn-war { background: var(--neon-red); color: white; }
-  .btn-buy { background: var(--neon-green); color: black; }
-  .btn-eco { background: var(--neon-purple); color: white; }
-  .btn-dm { background: #fff; color: #000; border: 1px solid var(--neon-blue); }
-  .btn-draft { background: linear-gradient(45deg, #550000, #ff0000); color: white; border: 1px solid red; }
-  .btn-trade { background: var(--neon-gold); color: black; }
-  .btn-sub { background: #333; color: #ccc; }
-  input { background: #222; border: 1px solid #555; color: white; padding: 10px; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
-  .tabs { display: flex; gap: 2px; margin-bottom: 10px; }
-  .tab { flex: 1; padding: 8px; background: #222; color: #888; text-align: center; cursor: pointer; font-size: 0.7em; }
-  .tab.active { background: #333; color: var(--neon-blue); border-bottom: 2px solid var(--neon-blue); }
-  .rank-item { display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid #222; font-size: 0.85em;}
-  .rank-num { font-family: 'Orbitron'; color: var(--neon-gold); width: 20px; font-weight: bold;}
-  canvas { border: 1px solid #555; background: #000; cursor: crosshair; image-rendering: pixelated; margin: 0 auto; display: block;}
-  .palette { display: flex; justify-content: center; gap: 5px; margin-top: 5px; flex-wrap: wrap;}
-  .color-dot { width: 20px; height: 20px; border-radius: 50%; border: 1px solid #fff; cursor: pointer; }
-  .pop-flag { width: 80px; height: 50px; border: 1px solid #ccc; display: block; margin: 0 auto 5px auto; image-rendering: pixelated; }
-  .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; display: flex; justify-content: center; align-items: center; }
-  .modal { background: #111; border: 1px solid var(--neon-blue); padding: 30px; width: 400px; max-width: 90%; text-align: center; border-radius: 8px; box-shadow: 0 0 20px var(--neon-blue); }
-  .hidden { display: none !important; }
-  #adminPanel { position: fixed; top: 5%; left: 5%; width: 90%; height: 90%; background: #000; border: 2px solid var(--neon-red); z-index: 10000; padding: 20px; overflow-y: auto; color: var(--neon-red); box-sizing: border-box; }
-  table { width: 100%; border-collapse: collapse; margin-top: 10px; color: #ccc; font-size: 0.85em; }
-  th, td { border: 1px solid #333; padding: 8px; text-align: center; }
-  .admin-edit-btn { background: #333; color: #00f3ff; border: 1px solid #555; padding: 2px 5px; font-size: 0.8em; cursor: pointer; }
-  #debugLog { position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.8); color: lime; font-size: 10px; z-index: 20000; padding: 2px; }
-</style>
-</head> 
+        /* UI Layer */
+        #ui-layer { position: fixed; top: 10px; left: 10px; width: 280px; pointer-events: none; z-index: 100; display: flex; flex-direction: column; gap: 10px; }
+        .glass { background: var(--ui-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.4); border-radius: 20px; box-shadow: var(--shadow); pointer-events: auto; padding: 15px; }
+        
+        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        h2 { margin: 0; font-size: 16px; font-weight: 700; }
+        .status-tag { font-size: 9px; font-weight: bold; padding: 4px 10px; border-radius: 20px; background: rgba(0,0,0,0.05); display: flex; align-items: center; gap: 4px; }
+        .dot { width: 6px; height: 6px; border-radius: 50%; background: #ccc; }
+        .dot.online { background: #34C759; box-shadow: 0 0 8px #34C759; }
+
+        label { display: block; font-size: 9px; font-weight: 700; color: #999; margin-bottom: 4px; text-transform: uppercase; }
+        input, select, button { width: 100%; border: none; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 10px; font-size: 13px; outline: none; box-sizing: border-box; }
+
+        /* Palette */
+        .brush-section { display: flex; align-items: center; gap: 10px; margin: 5px 0; }
+        #colorPreview { width: 44px; height: 44px; border-radius: 12px; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); position: relative; overflow: hidden; flex-shrink: 0; }
+        #colorPicker { position: absolute; top: -5px; left: -5px; width: 60px; height: 60px; cursor: pointer; opacity: 0; }
+        .palette { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; flex-grow: 1; }
+        .swatch { aspect-ratio: 1; border-radius: 5px; cursor: pointer; border: 1.5px solid transparent; }
+        .swatch.active { border-color: var(--primary); transform: scale(1.1); }
+
+        /* Admin Box */
+        .admin-box { border: 2px solid #ff3b30; background: rgba(255, 235, 235, 0.9); display: none; margin-top: 10px; }
+        .admin-btn { background: #007AFF; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 8px; font-weight: bold; }
+        .danger-btn { background: #ff3b30; }
+
+        /* Chat */
+        #chat-container { position: fixed; bottom: 10px; left: 10px; width: 300px; max-height: 150px; overflow: hidden; padding: 0; }
+        #messages { flex: 1; overflow-y: auto; padding: 10px; font-size: 11px; display: flex; flex-direction: column; gap: 4px; }
+        .msg { background: rgba(0,0,0,0.03); padding: 5px 10px; border-radius: 8px; }
+        #chat-input { background: transparent; border-top: 1px solid rgba(0,0,0,0.05); width: 100%; }
+
+        .cursor-label { position: fixed; pointer-events: none; background: #000; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 10px; transform: translate(10px, 10px); }
+        .guide { font-size: 9px; color: #999; margin-top: 10px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 8px; }
+    </style>
+</head>
 <body>
 
-<div id="overlayStart" class="overlay"> 
- <div id="menuMain" class="modal">  
-  <h1>Global Strategy</h1>  
-  <p style="color:#aaa;">領土争奪・国家運営シミュレーション</p>  
-  <div id="loadingMsg" style="color:var(--neon-green); margin-bottom:10px; display:none;">自動ログイン中...</div>  
-  <button class="btn-main" onclick="showScreen('Register')">🌍 新規建国</button>  
-  <button class="btn-buy" onclick="showScreen('Login')">🔑 ログイン</button>  
-  <button class="btn-sub" onclick="startSpectator()">👁️ 観戦モード</button> 
- </div>
- <div id="menuRegister" class="modal hidden">  
-  <h2>新規建国</h2> 
-  <input type="text" id="regName" placeholder="国名"> 
-  <input type="password" id="regPass" placeholder="パスワード"> 
-  <input type="text" id="regCurrency" placeholder="通貨単位 (例: 円, Dollar)"> 
-  <button id="btnRegSubmit" class="btn-main" onclick="register()">作成</button> 
-  <button class="btn-sub" onclick="showScreen('Main')">戻る</button> 
- </div>
- <div id="menuLogin" class="modal hidden">  
-  <h2>ログイン</h2> 
-  <input type="text" id="loginName" placeholder="国名"> 
-  <input type="password" id="loginPass" placeholder="パスワード"> 
-  <button class="btn-buy" id="loginSubmitBtn" onclick="login()">入国</button> 
-  <button class="btn-sub" onclick="showScreen('Main')">戻る</button> 
- </div>
-</div>
-
-<div id="overlayAdminAuth" class="overlay hidden"> 
- <div class="modal" style="border-color:red;"> 
-  <h2>管理者認証</h2> 
-  <input type="password" id="adminKey" placeholder="Password"> 
-  <button class="btn-war" onclick="attemptAdminLogin()">UNLOCK</button> 
-  <button class="btn-sub" onclick="document.getElementById('overlayAdminAuth').classList.add('hidden')">戻る</button> 
- </div> 
-</div>
-
-<div id="adminPanel" class="hidden"> 
- <h2>⚠️ サーバー管理コンソール</h2> 
- <div style="margin-bottom:10px;"> 
-  <button class="btn-sub" style="width:100px;" onclick="closeAdmin()">閉じる</button> 
-  <button class="btn-main" style="width:150px;" onclick="refreshAdminList()">リスト更新</button> 
- </div> 
- <table><thead><tr><th>国名</th><th>資金</th><th>幸福</th><th>人口</th><th>面積</th><th>GDP</th><th>操作</th></tr></thead><tbody id="adminTableBody"></tbody></table> 
-</div>
-
-<div id="gameUI" class="app-container hidden"> 
- <div class="map-section"> 
-  <div id="gameMap"></div> 
-  <div id="mapMsg" style="position:absolute; top:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.9); padding:15px; border:2px solid var(--neon-gold); color:var(--neon-gold); display:none; z-index:1000; pointer-events:none;"><b>【領土描画モード】</b></div> 
- </div>
- <div class="sidebar">  
-  <h1><span id="uiName">NATION</span></h1>  
-  <div class="stats-grid">
-   <div class="stat-card"><span class="stat-label">資金</span><span class="stat-val" id="valMoney">0</span><span style="font-size:0.7em" id="uiCurrency">$</span></div>
-   <div class="stat-card"><span class="stat-label">人口</span><span class="stat-val" id="valPop">0</span><span style="font-size:0.7em">人</span></div>
-   <div class="stat-card"><span class="stat-label">面積</span><span class="stat-val" id="valArea">0</span><span style="font-size:0.7em">km²</span></div>
-   <div class="stat-card"><span class="stat-label">幸福度</span><span class="stat-val" id="valHappy" style="color:var(--neon-green);">100</span><span style="font-size:0.7em">%</span></div>
-   <div class="stat-card"><span class="stat-label">石油 <span class="res-icon">🛢️</span></span><span class="stat-val" id="valOil">0</span></div>
-   <div class="stat-card"><span class="stat-label">鉄鉱石 <span class="res-icon">⛏️</span></span><span class="stat-val" id="valIron">0</span></div>
-  </div>
-  <div class="tabs"> <div class="tab active" onclick="setTab('main')">内政</div> <div class="tab" onclick="setTab('war')">軍事・外交</div> <div class="tab" onclick="setTab('rank')">順位</div> <div class="tab" onclick="setTab('flag')">国旗</div> </div>
-  
-  <div id="playerControls">
-    <div id="tab-main"> 
-        <h3>経済・財務</h3> 
-        <div style="font-size:0.8em; color:#ccc; margin-bottom:5px;">GDP: <b id="valGDP">0</b> <span id="uiCurrency2">$</span> / 維持費: <span id="valUpkeep" style="color:var(--neon-red)">0</span></div>
-        <button class="btn-main" onclick="invest()">🏭 産業投資 (-2000)</button> 
-        <button class="btn-eco" onclick="sellResources()">💰 資源売却</button>
-        <button class="btn-war" onclick="printMoney()">💸 通貨発行 (+10k/幸↓)</button>
-        <div style="margin-top:10px; font-size:0.8em; border-top:1px solid #333; padding-top:5px;">所得税率: <span id="taxVal" style="color:var(--neon-blue)">10</span>% <input type="range" id="taxRate" min="0" max="80" value="10" onchange="document.getElementById('taxVal').innerText=this.value"></div> 
-        <h3>領土</h3> 
-        <button class="btn-buy" onclick="startExpansion()">🗺️ 領土購入・描画</button> 
-        <button class="btn-sub" onclick="manualSave()">💾 サーバー保存</button> 
-        <button class="btn-sub" onclick="doLogout()">🚪 ログアウト</button> 
-    </div>
-    <div id="tab-war" class="hidden"> 
-        <h3>軍備 (戦闘力: <span id="valMil">0</span>)</h3> 
-        <button class="btn-war" onclick="recruit()">⚔️ 通常雇用 (-$1k / -500人)</button> 
-        <button class="btn-draft" onclick="draftSoldiers()">📢 強制徴兵 (無料 / 幸福↓↓)</button>
-        <h3>外交・工作</h3> 
-        <div id="requestBox" style="background:#1a1a1a; padding:10px; border-radius:4px; margin-bottom:10px; font-size:0.85em; border:1px solid #333;">申請なし</div> 
-        <h3>ターゲット</h3> 
-        <div class="stat-card" style="text-align:left; margin-bottom:10px; border-color:var(--neon-red);">対象: <b id="targetName">なし</b><br>状態: <span id="targetStatus">---</span><br><div id="warAutoMsg" style="color:var(--neon-red); font-size:0.8em; display:none;">⚠️ 自動戦争進行中...</div></div> 
-        <div style="display:flex; gap:5px;">
-            <button class="btn-trade" id="btnSendMoney" onclick="sendMoney()" disabled>💸 送金</button>
-            <button class="btn-trade" id="btnCedeLand" onclick="startTransferGeo()" disabled>🗺️ 領土譲渡</button>
+<div id="ui-layer">
+    <div class="glass">
+        <div class="header-row">
+            <h2 id="t-title">Infinite Canvas</h2>
+            <div class="status-tag"><div id="status-dot" class="dot"></div><span id="t-status">...</span></div>
         </div>
-        <button class="btn-dm" id="btnDM" onclick="sendDM()" disabled>📩 密書送信 (履歴なし)</button>
-        <button class="btn-buy" id="btnAlly" onclick="actionAlly()" disabled>🤝 同盟申請</button> 
-        <button class="btn-war" id="btnWar" onclick="actionWar()" disabled>💣 宣戦布告</button> 
+        <div style="display:flex; gap:10px; margin-bottom:10px;">
+            <div style="flex:1"><label id="t-label-lang">LANG</label><select id="langSelect"><option value="en">EN</option><option value="ja">JA</option></select></div>
+            <div style="flex:2"><label id="t-label-name">NAME</label><input type="text" id="nameInput"></div>
+        </div>
+        <div>
+            <label id="t-label-color">COLOR</label>
+            <div class="brush-section">
+                <div id="colorPreview"><input type="color" id="colorPicker" value="#007AFF"></div>
+                <div id="palette" class="palette"></div>
+            </div>
+            <div id="admin-brush-ui" style="display:none; margin-top:5px;">
+                <label>BRUSH SIZE: <span id="brushSizeVal">1</span></label>
+                <input type="range" id="brushSizeInput" min="1" max="20" value="1">
+            </div>
+        </div>
+        <div id="t-guide" class="guide"></div>
     </div>
-    <div id="tab-flag" class="hidden"> <h3>国旗エディタ</h3> <canvas id="flagCanvas" width="100" height="60"></canvas> <div class="palette" id="paletteBox"></div> <button class="btn-main" onclick="saveFlag()">💾 保存</button> <button class="btn-sub" onclick="clearFlag()">🗑 クリア</button> </div>
-  </div>
-  
-  <div id="spectatorMsg" class="hidden" style="padding:20px; text-align:center; color:var(--neon-green);">
-      <h3>👁️ 観戦モード中</h3>
-      <p>操作はできません。<br>世界情勢を観察しています。</p>
-      <button class="btn-sub" onclick="location.reload()">トップへ戻る</button>
-  </div>
-  
-  <div id="cancelOverlay" style="position:fixed; bottom:20px; left:50%; transform:translateX(-50%); z-index:2000; display:none;">
-      <button class="btn-war" style="width:200px; box-shadow:0 0 10px red;" onclick="cancelActionMode()">❌ モード終了</button>
-  </div>
-
-  <div id="tab-rank" class="hidden"> <h3>世界国力ランキング</h3> <div id="rankingList"></div> </div>
-  <div style="margin-top:auto; font-size:0.7em; color:#555; text-align:center;">Shift+Alt: Admin Panel</div>
- </div>
+    <div id="admin-mount"></div>
 </div>
 
-<div id="debugLog">System Initialized.</div>
+<div id="chat-container" class="glass"><div id="messages"></div><input type="text" id="chat-input"></div>
+<canvas id="gameCanvas"></canvas>
 
 <script>
-  // --- Constants ---
-  const PANTRY_ID = "5355906c-0f7f-4e97-9c05-65490bfe8f59";
-  const BASKET_NAME = "strategy_complete_final";
-  const API_URL = `https://getpantry.cloud/apiv1/pantry/${}/basket/${}`;
+// --- 多言語設定 ---
+const i18n = {
+    en: { title: "Infinite Canvas", status: "Wait", live: "Live", name: "Name", color: "Color", lang: "Lang", chat: "Chat...", guide: "• <b>Left/1 Finger</b>: Paint<br>• <b>Right/2 Fingers</b>: Move" },
+    ja: { title: "無限キャンバス", status: "待機中", live: "ライブ", name: "名前", color: "色", lang: "言語", chat: "チャット...", guide: "• <b>左クリック/1本指</b>: 描く<br>• <b>右クリック/2本指</b>: 移動" }
+};
+function setLanguage(lang) {
+    const t = i18n[lang] || i18n.en;
+    document.getElementById('t-title').innerText = t.title;
+    document.getElementById('t-label-name').innerText = t.name;
+    document.getElementById('t-label-color').innerText = t.color;
+    document.getElementById('t-label-lang').innerText = t.lang;
+    document.getElementById('chat-input').placeholder = t.chat;
+    document.getElementById('t-guide').innerHTML = t.guide;
+    if (document.getElementById('status-dot').classList.contains('online')) document.getElementById('t-status').innerText = t.live;
+}
 
-  // --- Globals ---
-  let myName = "", myData = {}, map, drawnItems, drawControl, selectedTarget = null;
-  let expansionMode = false, transferMode = false, isSyncing = false, isSpectator = false;
-  let lastWorldDataStr = "";
-
-  function log(msg) {
-      console.log(msg);
-      document.getElementById('debugLog').innerText = msg;
-  }
-
-  // --- Critical UI Functions (Defined FIRST) ---
-  function showScreen(id) {
-      ['Main','Register','Login'].forEach(n => document.getElementById('menu'+n).classList.add('hidden'));
-      document.getElementById('menu'+id).classList.remove('hidden');
-      log(`UI: ${id}`);
-  }
-
-  function setTab(id) {
-      document.querySelectorAll('[id^="tab-"]').forEach(e => e.classList.add('hidden'));
-      document.getElementById('tab-'+id).classList.remove('hidden');
-      document.querySelectorAll('.tab').forEach(e => e.classList.remove('active'));
-      if(event && event.target) event.target.classList.add('active');
-      if(id === 'rank') updateRanking(); 
-      if(id === 'flag') initFlagEditor();
-  }
-
-  // --- Safe DB Access ---
-  async function getDB() { 
-      try { 
-          const r = await fetch(API_URL + "?t=" + Date.now()); 
-          if(r.ok) {
-              const text = await r.text();
-              if(!text || text.trim() === "") return { nations: {} };
-              
-              const raw = JSON.parse(text);
-              if(raw.compressed && raw.data) {
-                  if(typeof LZString !== 'undefined') {
-                      const decompressed = LZString.decompressFromUTF16(raw.data);
-                      return decompressed ? JSON.parse(decompressed) : { nations: {} };
-                  } else {
-                      log("WARN: LZString missing, skipping decompression");
-                      return { nations: {} }; // Safety fallback
-                  }
-              }
-              return raw.nations ? raw : { nations: {} };
-          }
-      } catch(e){ log("DB Fetch Error: " + e.message); } 
-      return { nations: {} }; 
-  }
-
-  async function saveWorldDB(db) {
-      if(isSpectator) return;
-      isSyncing = true; log("Saving...");
-      try {
-          let payload;
-          if(typeof LZString !== 'undefined') {
-              const compressedStr = LZString.compressToUTF16(JSON.stringify(db));
-              payload = JSON.stringify({compressed:true, data:compressedStr});
-          } else {
-              payload = JSON.stringify(db);
-          }
-          await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body: payload });
-          log("Saved.");
-      } catch(e) { log("Save Failed."); }
-      isSyncing = false; 
-      setTimeout(syncWorld, 100); 
-  }
-  
-  async function saveMe(newData) {
-    if(isSyncing || isSpectator) return;
-    try {
-      const db = await getDB();
-      if(!db.nations) db.nations = {};
-      db.nations[myName] = newData;
-      await saveWorldDB(db);
-      myData = newData; 
-    } catch(e) { log(e.message); }
-  }
-
-  // --- Auth ---
-  async function register() {
-    const btn = document.getElementById('btnRegSubmit');
-    if(btn) { btn.disabled = true; btn.innerText = "..."; }
-
-    try {
-        const n = document.getElementById('regName').value;
-        const p = document.getElementById('regPass').value;
-        const curr = document.getElementById('regCurrency').value || "$";
-        if(!n || !p) throw new Error("入力不足");
-        
-        const db = await getDB(); 
-        if(!db.nations) db.nations = {};
-        if(db.nations[n]) throw new Error("使用済み");
-        
-        db.nations[n] = { 
-            pass: p, money: 20000000, population: 50000, gdp: 5000, military: 500, 
-            area: 0, geometries: [], allies: [], requests: [], warTarget: null, flag: null,
-            happiness: 100, currency: curr, resources: { oil: 0, iron: 0 }, secretMsg: null
-        };
-        await saveWorldDB(db); 
-        alert("成功"); showScreen('Login');
-    } catch(e) { alert(e.message); } 
-    finally { if(btn) { btn.disabled = false; btn.innerText = "作成"; } }
-  }
-
-  async function login(an, ap) {
-    const btn = document.getElementById('loginSubmitBtn');
-    if(btn) { btn.disabled = true; btn.innerText = "..."; }
-    
-    try {
-        const n = an || document.getElementById('loginName').value;
-        const p = ap || document.getElementById('loginPass').value;
-        if(!n || !p) throw new Error("入力不足");
-        
-        const db = await getDB();
-        const target = db.nations ? db.nations[n] : null;
-        if(!target || target.pass !== p) { 
-            if(!an) throw new Error("認証失敗");
-            else { if(btn) btn.disabled = false; document.getElementById('loadingMsg').style.display='none'; return; }
-        }
-        
-        localStorage.setItem('autoName', n); localStorage.setItem('autoPass', p);
-        myName = n; myData = target;
-        
-        // Patch data
-        if(!myData.geometries) myData.geometries = []; 
-        if(!myData.allies) myData.allies = []; 
-        if(!myData.requests) myData.requests = [];
-        if(myData.population === undefined) myData.population = 10000;
-        if(myData.happiness === undefined) myData.happiness = 100;
-        if(!myData.resources) myData.resources = { oil: 0, iron: 0 };
-        if(!myData.currency) myData.currency = "$";
-        
-        document.getElementById('overlayStart').classList.add('hidden'); 
-        document.getElementById('gameUI').classList.remove('hidden');
-        
-        try { initMap(); } catch(e) { log("Map Error"); }
-        startRealTimeSync(); 
-    } catch(e) {
-        alert(e.message);
-        document.getElementById('loadingMsg').style.display = 'none';
-    } finally {
-        if(btn) { btn.disabled = false; btn.innerText = "入国"; }
+// --- 管理者(2020302) ---
+const ADMIN_HASH = "3884b294060851f5c643b9e4073e51d951522f986427382d56d7827827e8a93a";
+async function sha256(m){const b=new TextEncoder().encode(m);const h=await crypto.subtle.digest('SHA-256',b);return Array.from(new Uint8Array(h)).map(x=>x.toString(16).padStart(2,'0')).join('');}
+window.onkeydown = async (e) => {
+    if (e.shiftKey && e.ctrlKey && e.altKey && e.key === 'A') {
+        const p = prompt("Access Code:");
+        if (await sha256(p) === ADMIN_HASH) activateAdmin();
     }
-  }
+};
 
-  function startRealTimeSync() {
-    setInterval(syncWorld, 2000); 
-    if(!isSpectator) setInterval(ecoTick, 5000);   
-  }
+let pendingImage = null; // 画像スタンプ用
 
-  async function syncWorld() {
-    if(isSyncing) return;
-    const db = await getDB();
-    if(!db.nations) return; 
+function activateAdmin() {
+    isAdmin = true;
+    document.getElementById('admin-brush-ui').style.display = 'block';
+    document.getElementById('admin-mount').innerHTML = `
+        <div class="glass admin-box" style="display:block;">
+            <h2 style="color:#d00;">GOD MODE</h2>
+            <label>IMPORT IMAGE</label><input type="file" id="imageInput" accept="image/*">
+            <label style="margin-top:5px;">SIZE (px)</label><input type="number" id="imgSize" value="50">
+            <button class="admin-btn" onclick="saveToPantry()">FORCE SAVE</button>
+            <button class="admin-btn danger-btn" onclick="clearCanvas()">CLEAR WORLD</button>
+        </div>`;
+    setupAdminEvents();
+}
 
-    const currentDataStr = JSON.stringify(db.nations);
-    if(currentDataStr !== lastWorldDataStr) {
-      renderWorld(db.nations);
-      lastWorldDataStr = currentDataStr;
-      
-      if(!isSpectator && db.nations[myName] && !expansionMode) {
-        const serverMe = db.nations[myName];
-        myData.area = serverMe.area;
-        myData.geometries = serverMe.geometries;
-        myData.warTarget = serverMe.warTarget;
-        myData.requests = serverMe.requests;
-        myData.allies = serverMe.allies;
-        if(serverMe.population !== undefined) myData.population = serverMe.population;
-        if(serverMe.happiness !== undefined) myData.happiness = serverMe.happiness;
-        if(serverMe.resources) myData.resources = serverMe.resources;
+// --- 通信・ロジック ---
+const PANTRY_ID = "1236839c-7644-4b65-881d-e65dc707e34e"; 
+const PANTRY_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/world_data_v2`;
+const gun = Gun(['https://gun-manhattan.herokuapp.com/gun']);
+const db = gun.get('infinite_canvas_ultimate_v5');
+const dotsDB = db.get('dots'), cursorDB = db.get('cursors'), chatDB = db.get('chat');
 
-        if(serverMe.money < myData.money - 2000 || serverMe.money > myData.money + 2000) {
-            myData.money = serverMe.money;
-        }
-        
-        if(serverMe.secretMsg) {
-            alert(`📩 密書: ${serverMe.secretMsg.from}\n"${serverMe.secretMsg.msg}"`);
-            serverMe.secretMsg = null;
-            db.nations[myName] = serverMe;
-            await saveWorldDB(db);
-            myData.secretMsg = null;
-        }
-      }
-      refreshUI();
-      if(document.getElementById('tab-rank').classList.contains('hidden') === false) updateRanking(db);
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let camX = 0, camY = 0, zoom = 15, myId = Math.random().toString(36).slice(2), myName = "Anon";
+let localDots = {}, isPainting = false, isDragging = false, lastP, brushSize = 1, isAdmin = false;
+let hoverPos = null;
+
+const toScreen = (wx, wy) => ({ x: (wx - camX) * zoom + canvas.width / 2, y: (wy - camY) * zoom + canvas.height / 2 });
+const toWorld = (sx, sy) => ({ wx: Math.floor((sx - canvas.width / 2) / zoom + camX), wy: Math.floor((sy - canvas.height / 2) / zoom + camY) });
+dotsDB.map().on((color, key) => { if (color) localDots[key] = color; else delete localDots[key]; });
+
+function render() {
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // ドット描画
+    for(let k in localDots){
+        const [x,y]=k.split(',').map(Number); const s=toScreen(x,y);
+        if(s.x>-zoom&&s.x<canvas.width&&s.y>-zoom&&s.y<canvas.height){ ctx.fillStyle=localDots[k]; ctx.fillRect(s.x,s.y,zoom+0.5,zoom+0.5); }
     }
-  }
 
-  function startSpectator() {
-      isSpectator = true;
-      document.getElementById('overlayStart').classList.add('hidden');
-      document.getElementById('gameUI').classList.remove('hidden');
-      document.getElementById('playerControls').classList.add('hidden');
-      document.getElementById('spectatorMsg').classList.remove('hidden');
-      document.getElementById('uiName').innerText = "SPECTATOR";
-      try { initMap(); } catch(e){}
-      startRealTimeSync();
-  }
+    // ガイド描画 (灰色)
+    if (hoverPos) {
+        ctx.fillStyle = "rgba(150, 150, 150, 0.4)";
+        if (pendingImage) {
+            // 画像スタンプガイド
+            const s = toScreen(hoverPos.wx, hoverPos.wy);
+            ctx.fillRect(s.x, s.y, pendingImage.w * zoom, pendingImage.h * zoom);
+        } else {
+            // 筆ガイド
+            const r = Math.floor((brushSize - 1) / 2);
+            const s = toScreen(hoverPos.wx - r, hoverPos.wy - r);
+            ctx.fillRect(s.x, s.y, brushSize * zoom, brushSize * zoom);
+        }
+    }
+    requestAnimationFrame(render);
+}
 
-  // --- Map & Logic ---
-  function initMap() {
-    if(typeof L === 'undefined') { log("Map Lib Missing"); return; }
-    if(map) return;
-    map = L.map('gameMap').setView([35, 135], 4);
-    L.tileLayer('https://{}.basemaps.cartocdn.com/dark_all/{}/{}/{}{}.png').addTo(map);
-    drawnItems = new L.FeatureGroup(); map.addLayer(drawnItems);
-    map.on('popupopen', e => {
-      const div = document.createElement('div'); div.innerHTML = e.popup.getContent();
-      const target = div.querySelector('b') ? div.querySelector('b').innerText : "";
-      if(target && target !== myName && !isSpectator) selectTarget(target);
-    });
-    
-    map.on('click', async e => {
-        if(transferMode && selectedTarget) {
-            if(selectedTarget === myName) { alert("自分には不可"); return; }
-            if(typeof turf === 'undefined') return;
-            const clickedPoint = turf.point([e.latlng.lng, e.latlng.lat]);
-            let foundIndex = -1;
-            for(let i=0; i<myData.geometries.length; i++) {
-                if(turf.booleanPointInPolygon(clickedPoint, myData.geometries[i])) {
-                    foundIndex = i; break;
+function paint(x, y) {
+    if (pendingImage) {
+        // 画像を配置
+        const s = toWorld(x, y);
+        pendingImage.data.forEach(p => dotsDB.get(`${s.wx + p.x},${s.wy + p.y}`).put(p.hex));
+        pendingImage = null; // 貼り付けたら終了
+        return;
+    }
+    const pos = toWorld(x, y); const color = document.getElementById('colorPicker').value;
+    const r = Math.floor((brushSize - 1) / 2);
+    for(let dx = -r; dx <= r; dx++) for(let dy = -r; dy <= r; dy++) {
+        const k = `${pos.wx+dx},${pos.wy+dy}`; if (localDots[k]!==color) dotsDB.get(k).put(color);
+    }
+}
+
+canvas.onmousedown = (e) => {
+    if (e.button === 0) { isPainting = true; paint(e.clientX, e.clientY); }
+    else { isDragging = true; lastP = {x: e.clientX, y: e.clientY}; }
+};
+window.onmousemove = (e) => {
+    hoverPos = toWorld(e.clientX, e.clientY);
+    if (isPainting) paint(e.clientX, e.clientY);
+    if (isDragging) { camX -= (e.clientX - lastP.x)/zoom; camY -= (e.clientY - lastP.y)/zoom; lastP = {x: e.clientX, y: e.clientY}; }
+    cursorDB.get(myId).put({ x: hoverPos.wx, y: hoverPos.wy, name: myName, time: Date.now() });
+};
+window.onmouseup = () => isPainting = isDragging = false;
+window.onwheel = (e) => zoom = Math.min(Math.max(zoom * (e.deltaY > 0 ? 0.85 : 1.15), 1), 80);
+canvas.oncontextmenu = e => e.preventDefault();
+
+// タッチ
+canvas.addEventListener('touchstart', e => {
+    e.preventDefault(); const t = e.touches[0]; hoverPos = toWorld(t.clientX, t.clientY);
+    if (e.touches.length === 1) { isPainting = true; paint(t.clientX, t.clientY); }
+    else { isDragging = true; lastP = {x: (e.touches[0].pageX + e.touches[1].pageX)/2, y: (e.touches[0].pageY + e.touches[1].pageY)/2}; }
+}, {passive:false});
+canvas.addEventListener('touchmove', e => {
+    e.preventDefault(); const t = e.touches[0]; hoverPos = toWorld(t.clientX, t.clientY);
+    if (e.touches.length === 1 && isPainting) paint(t.clientX, t.clientY);
+}, {passive:false});
+
+function setupAdminEvents() {
+    document.getElementById('imageInput').onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const img = new Image();
+            img.onload = () => {
+                const size = parseInt(document.getElementById('imgSize').value);
+                const tempC = document.createElement('canvas'); const tCtx = tempC.getContext('2d');
+                tempC.width = size; tempC.height = Math.floor(size * (img.height / img.width));
+                tCtx.drawImage(img, 0, 0, tempC.width, tempC.height);
+                const d = tCtx.getImageData(0, 0, tempC.width, tempC.height).data;
+                const pixels = [];
+                for(let y=0; y<tempC.height; y++) for(let x=0; x<tempC.width; x++) {
+                    const i = (y * tempC.width + x) * 4;
+                    if(d[i+3] > 128) pixels.push({x, y, hex: "#" + ((1 << 24) + (d[i] << 16) + (d[i+1] << 8) + d[i+2]).toString(16).slice(1)});
                 }
-            }
-            if(foundIndex !== -1) {
-                if(confirm(`譲渡: ${}?`)) {
-                    const db = await getDB();
-                    if(!db.nations[myName] || !db.nations[selectedTarget]) return;
-                    const poly = db.nations[myName].geometries.splice(foundIndex, 1)[0];
-                    if(!poly) return;
-                    // Recalc area
-                    db.nations[myName].area = 0; 
-                    db.nations[myName].geometries.forEach(g => db.nations[myName].area += Math.round(turf.area(g)/1000000));
-                    
-                    db.nations[selectedTarget].geometries.push(poly);
-                    let areaT = 0; 
-                    db.nations[selectedTarget].geometries.forEach(g=>areaT += Math.round(turf.area(g)/1000000));
-                    db.nations[selectedTarget].area = areaT;
-                    
-                    await saveWorldDB(db);
-                    alert("完了");
-                    cancelActionMode();
-                }
-            }
-        }
-    });
-  }
+                pendingImage = { data: pixels, w: tempC.width, h: tempC.height };
+                alert("Image loaded! Click on canvas to stamp.");
+            }; img.src = ev.target.result;
+        }; reader.readAsDataURL(e.target.files[0]);
+    };
+    document.getElementById('brushSizeInput').oninput = (e) => { brushSize = e.target.value; document.getElementById('brushSizeVal').innerText = brushSize; };
+}
 
-  function renderWorld(ns) {
-    if(!drawnItems) return;
-    drawnItems.clearLayers(); if(!ns) return;
-    Object.keys(ns).forEach(key => {
-      const n = ns[key], isMe = (key === myName), isAlly = (myData.allies || []).includes(key), isWar = (myData.warTarget === key);
-      let color = isMe ? "#00f3ff" : (isWar ? "#ff8800" : (isAlly ? "#00ff99" : "#ff0055"));
-      const fImg = n.flag ? `<img src="${n.flag}" class="pop-flag">` : "";
-      const popShow = n.population ? n.population.toLocaleString() : "???";
-      (n.geometries || []).forEach(geo => {
-        L.geoJSON(geo, { style: { color: color, weight: 2, fillOpacity: 0.3 } })
-        .bindPopup(`<div style="text-align:center;">${}<b>${}</b><br>軍事: ${n.military}<br>人口: ${popShow}<br>幸福: ${n.happiness || 100}%</div>`).addTo(drawnItems);
-      });
-    });
-  }
-
-  function startExpansion() {
-    if(isSpectator) return;
-    expansionMode = true; 
-    document.getElementById('mapMsg').innerText="【領土購入モード】"; 
-    document.getElementById('mapMsg').style.display = 'block';
-    document.getElementById('cancelOverlay').style.display = 'block'; 
-
-    if(drawControl) map.removeControl(drawControl);
-    drawControl = new L.Control.Draw({ draw: { polygon: { allowIntersection: false }, rectangle:true, circle:false, marker:false, polyline:false }, edit: false });
-    map.addControl(drawControl);
-    
-    map.off(L.Draw.Event.CREATED); 
-    map.on(L.Draw.Event.CREATED, async e => {
-      if(!expansionMode) return;
-      const newGeo = e.layer.toGeoJSON(); 
-      const db = await getDB(); 
-      let overlap = false;
-      if(typeof turf !== 'undefined') {
-          Object.keys(db.nations).forEach(k => { if(k !== myName) (db.nations[k].geometries || []).forEach(g => { if(turf.intersect(newGeo, g)) overlap = true; }); });
-          if(overlap) { alert("重複しています"); return; }
-      }
-      
-      const a = (typeof turf !== 'undefined') ? Math.round(turf.area(newGeo)/1000000) : 100;
-      const cost = myData.area === 0 ? 0 : a * 100;
-      
-      if(myData.money >= cost && confirm(`費用 ${cost.toLocaleString()}${myData.currency} で購入?`)) {
-        let current = [...myData.geometries, newGeo];
-        if(typeof turf !== 'undefined') {
-            try { let m = current[0]; for(let i=1; i<current.length; i++){ let r = turf.union(m, current[i]); if(r) m = r; } myData.geometries = [m]; }
-            catch(err) { myData.geometries = current; }
-        } else myData.geometries = current;
-        
-        myData.money -= cost; 
-        myData.area = 0; 
-        if(typeof turf !== 'undefined') myData.geometries.forEach(g => { myData.area += Math.round(turf.area(g)/1000000); });
-        else myData.area += a;
-        
-        await saveMe(myData); 
-        alert("購入完了");
-      }
-      cancelActionMode();
-    });
-  }
-  
-  function cancelActionMode() {
-      expansionMode = false; transferMode = false;
-      document.getElementById('mapMsg').style.display = 'none';
-      document.getElementById('cancelOverlay').style.display = 'none';
-      if(drawControl && map) map.removeControl(drawControl);
-  }
-
-  // --- Logic Loop ---
-  async function ecoTick() { 
-    if(!myData.gdp || isSpectator) return;
-    const upkeep = myData.military * 2; 
-    if(myData.money >= upkeep) myData.money -= upkeep;
-    else {
-        const affordable = Math.floor(myData.money / 2);
-        myData.military = affordable; myData.money = 0;
-        myData.happiness = Math.max(0, myData.happiness - 2); 
+// UI
+const colors = ["#000000", "#FFFFFF", "#FF3B30", "#FF9500", "#FFCC00", "#4CD964", "#5AC8FA", "#007AFF", "#5856D6", "#AF52DE", "#FF2D55", "#8E8E93"];
+colors.forEach(c => {
+    const s = document.createElement('div'); s.className = 'swatch'; s.style.backgroundColor = c;
+    s.onclick = () => { document.getElementById('colorPicker').value = c; document.getElementById('colorPreview').style.backgroundColor = c; };
+    document.getElementById('palette').appendChild(s);
+});
+document.getElementById('nameInput').oninput = (e) => myName = e.target.value || "Anon";
+chatDB.map().on((data) => {
+    if (!data) return;
+    const m = document.getElementById('messages'); const d = document.createElement('div');
+    d.className = 'msg'; d.innerHTML = `<b>${data.user}</b>${data.text}`;
+    m.appendChild(d); m.scrollTop = m.scrollHeight; if(m.childNodes.length > 20) m.removeChild(m.firstChild);
+});
+document.getElementById('chat-input').onkeypress = (e) => {
+    if (e.key === 'Enter' && e.target.value.trim() !== "") {
+        chatDB.get(Date.now()).put({ user: myName, text: e.target.value }); e.target.value = "";
     }
-    const taxRate = parseInt(document.getElementById('taxRate').value);
-    myData.money += myData.gdp * (taxRate/100); 
-    if(myData.area > 0) {
-        myData.resources.oil += Math.floor(myData.area / 500) + 1;
-        myData.resources.iron += Math.floor(myData.area / 300) + 1;
+};
+
+const otherCursors = {};
+cursorDB.map().on((data, id) => {
+    if (id === myId || !data) return;
+    if (!otherCursors[id]) {
+        const el = document.createElement('div'); el.className = 'cursor-label';
+        document.body.appendChild(el); otherCursors[id] = el;
     }
-    if(taxRate > 20) myData.happiness = Math.max(0, myData.happiness - 2);
-    else if(taxRate <= 10) myData.happiness = Math.min(100, myData.happiness + 1);
-    if(myData.population) {
-        if(myData.happiness >= 80) myData.population = Math.floor(myData.population * 1.02);
-        else if(myData.happiness <= 20) myData.population = Math.floor(myData.population * 0.98);
-        else myData.population = Math.floor(myData.population * 1.005);
+    const s = toScreen(data.x, data.y);
+    otherCursors[id].style.left = s.x + 'px'; otherCursors[id].style.top = s.y + 'px';
+    otherCursors[id].innerText = data.name;
+    otherCursors[id].style.opacity = (Date.now() - data.time > 5000) ? 0 : 1;
+});
+
+async function saveToPantry() { try{ await fetch(PANTRY_URL, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(localDots) }); }catch(e){} }
+async function loadFromPantry() {
+    const res = await fetch(PANTRY_URL);
+    if (res.ok) {
+        const data = await res.json(); for (let key in data) dotsDB.get(key).put(data[key]);
+        document.getElementById('status-dot').classList.add("online");
+        setLanguage(document.getElementById('langSelect').value);
     }
-    if(myData.warTarget) await autoWarProcess();
-    refreshUI(); 
-  }
+}
+function clearCanvas() { if(confirm("WIPE?")) dotsDB.put(null); }
+setInterval(() => { if(Object.keys(localDots).length > 0) saveToPantry(); }, 30000);
+loadFromPantry();
 
-  async function autoWarProcess() {
-    const db = await getDB();
-    const enName = myData.warTarget;
-    let en = db.nations[enName];
-    if(!en) { myData.warTarget = null; return; }
-    
-    if(myData.military * (0.6 + Math.random()) > en.military * (0.6 + Math.random())) {
-       en.area = Math.floor(en.area * 0.9); myData.area += Math.floor(en.area * 0.1);
-       en.gdp = Math.floor(en.gdp * 0.9); myData.gdp += Math.floor(en.gdp * 0.1);
-       en.population = Math.floor(en.population * 0.9); myData.population += Math.floor(en.population * 0.1);
-       
-       if(en.geometries.length > 0) { 
-        const stolen = en.geometries.pop();
-        myData.geometries.push(stolen); 
-       }
-       myData.military = Math.max(0, myData.military - 50); 
-       en.military = Math.max(0, en.military - 100);
-       
-       if(en.area <= 50 || en.military <= 0) {
-        alert(`${} を併合！`); 
-        myData.area += en.area; 
-        myData.geometries.push(...en.geometries);
-        delete db.nations[enName]; 
-        myData.warTarget = null; 
-       } else {
-         en.happiness = Math.max(0, en.happiness - 10);
-         db.nations[enName] = en; 
-       }
-    } else { 
-      myData.military = Math.max(0, myData.military - 100); 
-      myData.happiness = Math.max(0, myData.happiness - 2); 
-    }
-    db.nations[myName] = myData; 
-    await saveWorldDB(db); 
-  }
-
-  function invest() { if(myData.money>=2000){myData.money-=2000; myData.gdp+=500; refreshUI(); saveMe(myData);} }
-  function recruit() { if(myData.money>=1000 && myData.population>=500){myData.money-=1000; myData.population-=500; myData.military+=250; refreshUI(); saveMe(myData);} else { alert("資金または人口が不足"); } }
-  function draftSoldiers() { if(confirm("【緊急徴兵】")) { if(myData.population >= 2000) { myData.population -= 2000; myData.military += 2000; myData.happiness = Math.max(0, myData.happiness - 20); refreshUI(); saveMe(myData); } else { alert("人口不足"); } } }
-  function sellResources() { const earn = (myData.resources.oil * 100) + (myData.resources.iron * 50); if(earn > 0) { myData.money += earn; myData.resources.oil = 0; myData.resources.iron = 0; refreshUI(); saveMe(myData); alert(`+${earn} 獲得`); } else { alert("資源なし"); } }
-  function printMoney() { if(confirm("通貨発行")) { myData.money += 10000; myData.happiness = Math.max(0, myData.happiness - 5); refreshUI(); saveMe(myData); } }
-  
-  async function sendDM() {
-      if(!selectedTarget) return;
-      const msg = prompt(`【密書送信】宛先: ${}`);
-      if(msg) {
-          const db = await getDB();
-          if(db.nations && db.nations[selectedTarget]) {
-              db.nations[selectedTarget].secretMsg = { from: myName, msg: msg };
-              await saveWorldDB(db);
-              alert("送信完了");
-          }
-      }
-  }
-
-  async function sendMoney() {
-      if(!selectedTarget) return;
-      const amount = parseInt(prompt(`【資金援助】\n相手: ${}\n送金額:`));
-      if(amount && amount > 0 && myData.money >= amount) {
-          myData.money -= amount;
-          const db = await getDB();
-          if(db.nations && db.nations[selectedTarget]) {
-              db.nations[selectedTarget].money += amount;
-              db.nations[myName] = myData; 
-              await saveWorldDB(db);
-              refreshUI();
-              alert("送金完了");
-          } else { alert("送信先不在"); myData.money += amount; }
-      } else { alert("無効な数値"); }
-  }
-
-  function startTransferGeo() {
-      if(!selectedTarget) return;
-      alert("【領土譲渡モード】");
-      transferMode = true;
-      document.getElementById('mapMsg').innerText = `【譲渡モード】相手: ${}`;
-      document.getElementById('mapMsg').style.display = 'block';
-      document.getElementById('cancelOverlay').style.display = 'block';
-  }
-
-  function manualSave() { saveMe(myData); alert("保存完了"); }
-  function doLogout() { localStorage.clear(); location.reload(); }
-  function selectTarget(n) { 
-      selectedTarget = n; 
-      document.getElementById('targetName').innerText = n; 
-      document.getElementById('btnAlly').disabled = false; 
-      document.getElementById('btnWar').disabled = false; 
-      document.getElementById('btnDM').disabled = false; 
-      document.getElementById('btnSendMoney').disabled = false;
-      document.getElementById('btnCedeLand').disabled = false;
-  }
-
-  async function actionAlly() { if(!selectedTarget)return; const db = await getDB(); if(!db.nations[selectedTarget].requests) db.nations[selectedTarget].requests=[]; if(!db.nations[selectedTarget].requests.includes(myName)){db.nations[selectedTarget].requests.push(myName); await saveWorldDB(db); alert("申請送信");} }
-  async function acceptRequest(s) { myData.requests=myData.requests.filter(r=>r!==s); myData.allies.push(s); const db=await getDB(); if(db.nations[s]){if(!db.nations[s].allies)db.nations[s].allies=[]; db.nations[s].allies.push(myName); db.nations[myName]=myData; await saveWorldDB(db); refreshUI(); syncWorld(); alert(`同盟成立: ${}`);} }
-  async function actionWar() { if(confirm(`${} に宣戦布告？`)){ myData.warTarget=selectedTarget; saveMe(myData); } }
-
-  function refreshUI() {
-    if(isSpectator) return;
-    document.getElementById('valMoney').innerText = Math.floor(myData.money).toLocaleString();
-    document.getElementById('valArea').innerText = myData.area.toLocaleString();
-    document.getElementById('valGDP').innerText = Math.floor(myData.gdp).toLocaleString();
-    document.getElementById('valMil').innerText = myData.military.toLocaleString();
-    document.getElementById('valPop').innerText = Math.floor(myData.population || 0).toLocaleString();
-    document.getElementById('uiName').innerText = myName;
-    document.getElementById('btnWar').style.display = myData.warTarget ? 'none' : 'block';
-    document.getElementById('warAutoMsg').style.display = myData.warTarget ? 'block' : 'none';
-    document.getElementById('valHappy').innerText = myData.happiness;
-    document.getElementById('valOil').innerText = myData.resources ? myData.resources.oil : 0;
-    document.getElementById('valIron').innerText = myData.resources ? myData.resources.iron : 0;
-    document.getElementById('uiCurrency').innerText = myData.currency || "$";
-    document.getElementById('uiCurrency2').innerText = myData.currency || "$";
-    document.getElementById('valUpkeep').innerText = "-" + (myData.military * 2).toLocaleString();
-    const rb = document.getElementById('requestBox'); 
-    let reqHtml = (myData.requests && myData.requests.length > 0) ? "" : "申請なし";
-    (myData.requests || []).forEach(s => { reqHtml += `<div>${} <button class="admin-edit-btn" onclick="acceptRequest('${}')">承諾</button></div>`; });
-    rb.innerHTML = reqHtml;
-  }
-  
-  async function updateRanking(dbParam) {
-    const db = dbParam || await getDB();
-    if(!db.nations) return;
-    const ranks = Object.keys(db.nations).map(k => {
-      const n = db.nations[k]; 
-      const popScore = (n.population || 0) / 1000;
-      const s = Math.floor(n.gdp + (n.military * 10) + (n.area / 100) + popScore);
-      return { name: k, score: s };
-    }).sort((a, b) => b.score - a.score);
-    const list = document.getElementById('rankingList'); list.innerHTML = "";
-    ranks.slice(0, 10).forEach((r, i) => { list.innerHTML += `<div class="rank-item"><span class="rank-num">${i+1}</span><span class="rank-name">${r.name}</span><span class="rank-score">${r.score.toLocaleString()}</span></div>`; });
-  }
-
-  function attemptAdminLogin() { if(document.getElementById('adminKey').value === "201305042020302") { localStorage.setItem('adminSession', 'active'); document.getElementById('adminPanel').classList.remove('hidden'); refreshAdminList(); } }
-  function closeAdmin() { document.getElementById('adminPanel').classList.add('hidden'); }
-  async function refreshAdminList() {
-    const t = document.getElementById('adminTableBody'); t.innerHTML = ""; const db = await getDB();
-    if(!db.nations) return;
-    Object.keys(db.nations).forEach(k => {
-      const n = db.nations[k];
-      t.innerHTML += `<tr><td>${}</td>
-      <td>${n.money} <button class="admin-edit-btn" onclick="adminEdit('${}','money',${n.money})">変</button></td>
-      <td>${n.happiness} <button class="admin-edit-btn" onclick="adminEdit('${}','happiness',${n.happiness || 50})">変</button></td>
-      <td>${n.population} <button class="admin-edit-btn" onclick="adminEdit('${}','population',${n.population || 0})">変</button></td>
-      <td>${n.area} <button class="admin-edit-btn" onclick="adminEdit('${}','area',${n.area})">変</button></td>
-      <td>${n.gdp} <button class="admin-edit-btn" onclick="adminEdit('${}','gdp',${n.gdp})">変</button></td>
-      <td><button onclick="del('${}')" style="background:red; color:white;">消</button></td></tr>`;
-    });
-  }
-  async function adminEdit(c,k,v){ let n=prompt("変更後",v); if(n!==null){ const db=await getDB(); db.nations[c][k]=(k==='pass'?n:Number(n)); await saveWorldDB(db); refreshAdminList(); }}
-  async function del(n){ if(confirm("削除？")){ const db=await getDB(); delete db.nations[n]; await saveWorldDB(db); refreshAdminList(); }}
-
-  let flagCtx, fCur="#fff", fDraw=false;
-  function initFlagEditor() {
-    const c = document.getElementById('flagCanvas'); flagCtx = c.getContext('2d');
-    if(myData.flag) { const i=new Image(); i.onload=()=>flagCtx.drawImage(i,0,0); i.src=myData.flag; } else { flagCtx.fillStyle="#fff"; flagCtx.fillRect(0,0,100,60); }
-    const pal = document.getElementById('paletteBox'); pal.innerHTML="";
-    ['#000','#fff','#f00','#0f0','#00f','#ff0','#0ff','#f0f'].forEach(col => { const d = document.createElement('div'); d.className='color-dot'; d.style.background=col; d.onclick=()=>fCur=col; pal.appendChild(d); });
-    c.onmousedown=e=>{ fDraw=true; drawF(e); }; c.onmousemove=e=>{ if(fDraw) drawF(e); }; c.onmouseup=()=>fDraw=false;
-  }
-  function drawF(e) { const r=document.getElementById('flagCanvas').getBoundingClientRect(); flagCtx.fillStyle=fCur; flagCtx.fillRect(Math.floor((e.clientX-r.left)/10)*10, Math.floor((e.clientY-r.top)/10)*10, 10, 10); }
-  function clearFlag() { flagCtx.fillStyle="#fff"; flagCtx.fillRect(0,0,100,60); }
-  async function saveFlag() { myData.flag = document.getElementById('flagCanvas').toDataURL(); saveMe(myData); alert("国旗保存"); }
-
-  window.onload = function() {
-      const savedName = localStorage.getItem('autoName'), savedPass = localStorage.getItem('autoPass');
-      if(savedName && savedPass) login(savedName, savedPass);
-  };
+const userL = navigator.language.split('-')[0];
+document.getElementById('langSelect').value = i18n[userL] ? userL : 'en';
+setLanguage(document.getElementById('langSelect').value);
+render();
 </script>
 </body>
 </html>
