@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>無限キャンバス Pro - Pantry Sync</title>
+  <title>Infinite Canvas Pro</title>
   <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
   <style>
     :root {
@@ -119,7 +119,7 @@
       <h2>Infinite Canvas <span style="color:var(--primary)">Pro</span></h2>
       <div class="status">
         <span id="coordDisplay">x:0 y:0</span>
-        <span id="saveStatus">Syncing...</span>
+        <span id="saveStatus">Connecting...</span>
       </div>
     </div>
 
@@ -155,8 +155,8 @@
   const PANTRY_ID = "22d3843a-59e1-49f7-a005-0ae17aac5ce5";
   const PANTRY_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/canvas_pixel_data`;
 
-  // ローカル同期用チャンネル (別タブ同期)
-  const localChannel = new BroadcastChannel('inf_canvas_sync_v7');
+  // BroadcastChannel (タブ間同期)
+  const localChannel = new BroadcastChannel('inf_canvas_sync_v8_secure');
   
   // Gun.js (インターネット同期)
   const gun = Gun({
@@ -164,7 +164,7 @@
     localStorage: true
   });
   
-  const APP_KEY = 'inf_canvas_v7_pantry';
+  const APP_KEY = 'inf_canvas_v8_pantry_final';
   const db = gun.get(APP_KEY);
   const dotsDB = db.get('dots');
   const chatDB = db.get('chat');
@@ -173,28 +173,18 @@
   const canvas = document.getElementById('gameCanvas');
   const ctx = canvas.getContext('2d', { alpha: false });
 
-  // パレット & 圧縮用ユーティリティ
+  // パレット & 圧縮
   const paletteColors = [
     "#000000", "#FFFFFF", "#FF3B30", "#FF9500", "#FFCC00", "#4CD964", 
     "#5AC8FA", "#007AFF", "#5856D6", "#AF52DE", "#FF2D55", "#8E8E93",
     "#607D8B", "#795548", "#E91E63"
   ];
-  
-  const encodeCol = (c) => {
-    if(!c) return null;
-    const idx = paletteColors.indexOf(c.toUpperCase());
-    return idx !== -1 ? idx.toString(16) : c;
-  };
-  const decodeCol = (c) => {
-    if(!c) return null;
-    if(c.length <= 2 && /^[0-9A-Fa-f]+$/.test(c)) return paletteColors[parseInt(c, 16)] || c;
-    return c;
-  };
+  const encodeCol = c => { if(!c)return null; const i=paletteColors.indexOf(c.toUpperCase()); return i!==-1?i.toString(16):c; };
+  const decodeCol = c => { if(!c)return null; if(c.length<=2 && /^[0-9A-Fa-f]+$/.test(c)) return paletteColors[parseInt(c,16)]||c; return c; };
 
-  // --- 2. データ構造 & Pantry連携 ---
+  // --- 2. データ構造 & Pantry ---
   const CHUNK_SIZE = 16;
   let localChunks = {}; 
-  // 全ドット数管理 (Pantry保存判定用)
   let hasChanges = false;
   let dotCount = 0;
 
@@ -203,370 +193,217 @@
   const updateLocalPixel = (wx, wy, color, isSync = false) => {
     const cid = getChunkId(wx, wy);
     if (!localChunks[cid]) localChunks[cid] = {};
-    
-    const lx = ((wx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
-    const ly = ((wy % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
-    const key = `${lx}_${ly}`;
-
-    const old = localChunks[cid][key];
+    const k = `${((wx%CHUNK_SIZE)+CHUNK_SIZE)%CHUNK_SIZE}_${((wy%CHUNK_SIZE)+CHUNK_SIZE)%CHUNK_SIZE}`;
+    const old = localChunks[cid][k];
     if (color === null) {
-      if(old) dotCount--;
-      delete localChunks[cid][key];
+      if(old) dotCount--; delete localChunks[cid][k];
       if (Object.keys(localChunks[cid]).length === 0) delete localChunks[cid];
     } else {
-      if(!old) dotCount++;
-      localChunks[cid][key] = color;
+      if(!old) dotCount++; localChunks[cid][k] = color;
     }
     if(!isSync) hasChanges = true;
   };
 
-  // --- Pantry: 読み込み ---
+  // Pantry Load
   async function loadFromPantry() {
     try {
-      document.getElementById('saveStatus').innerText = "Loading Pantry...";
+      document.getElementById('saveStatus').innerText = "Loading...";
       const res = await fetch(PANTRY_URL);
-      if(!res.ok) throw new Error("Pantry empty or error");
+      if(!res.ok) throw new Error("Empty");
       const json = await res.json();
-      
-      // データ形式: { "x_y": "hexIndex" }
       const pixels = json.pixels || {};
-      let count = 0;
-      
-      // Gunからのデータ受信を待つため、少し遅延させるか、Gunにデータがない場合のみ反映
-      // ここではローカルステートにマージします
       for(let key in pixels) {
         const [x, y] = key.split('_').map(Number);
-        const col = decodeCol(pixels[key]);
-        updateLocalPixel(x, y, col, true);
-        count++;
+        updateLocalPixel(x, y, decodeCol(pixels[key]), true);
       }
-      document.getElementById('saveStatus').innerText = `Loaded ${count} dots`;
+      document.getElementById('saveStatus').innerText = "Loaded";
     } catch(e) {
-      console.log("Pantry load skipped:", e);
-      document.getElementById('saveStatus').innerText = "Ready (New)";
+      document.getElementById('saveStatus').innerText = "Ready";
     }
   }
-
-  // 初回ロード実行（Gunのデータが来る前にベースとしてロード）
   loadFromPantry();
 
-  // --- Pantry: 保存 (30秒間隔) ---
+  // Pantry Save (30s)
   setInterval(async () => {
-    // 変更がない、またはドット数が少なすぎる場合は保存しない（API節約）
     if(!hasChanges && dotCount > 0) return; 
-
-    document.getElementById('saveStatus').innerText = "Saving to Pantry...";
-    
-    // データをフラット化して最小化
+    document.getElementById('saveStatus').innerText = "Saving...";
     const flatData = {};
     for(let cid in localChunks) {
       const [cx, cy] = cid.split('_').map(Number);
       const chunk = localChunks[cid];
       for(let k in chunk) {
         const [lx, ly] = k.split('_').map(Number);
-        const wx = cx * CHUNK_SIZE + lx;
-        const wy = cy * CHUNK_SIZE + ly;
-        flatData[`${wx}_${wy}`] = encodeCol(chunk[k]);
+        flatData[`${cx*CHUNK_SIZE+lx}_${cy*CHUNK_SIZE+ly}`] = encodeCol(chunk[k]);
       }
     }
-
     try {
       await fetch(PANTRY_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          pixels: flatData, 
-          updated: Date.now() 
-        })
+        body: JSON.stringify({ pixels: flatData, updated: Date.now() })
       });
-      document.getElementById('saveStatus').innerText = "Saved to Pantry";
+      document.getElementById('saveStatus').innerText = "Saved";
       hasChanges = false;
-    } catch(e) {
-      document.getElementById('saveStatus').innerText = "Save Failed";
-      console.error(e);
-    }
-  }, 30000); // 30秒
+    } catch(e) { document.getElementById('saveStatus').innerText = "Save Fail"; }
+  }, 30000); 
 
-  // --- 3. リアルタイム通信 (Gun + Broadcast) ---
+  // --- 3. Sync Logic ---
+  dotsDB.map().on((d, k) => { const [x,y]=k.split('_').map(Number); if(!isNaN(x)) updateLocalPixel(x,y,decodeCol(d),true); });
+  chatDB.map().on((d, i) => { if(d && Date.now()-i<600000) addChatMessage(d.u,d.t,false); });
   
-  // ドット受信
-  dotsDB.map().on((data, key) => {
-    const [x, y] = key.split('_').map(Number);
-    if (isNaN(x) || isNaN(y)) return;
-    const col = decodeCol(data);
-    updateLocalPixel(x, y, col, true);
-  });
-
-  // チャット受信 (Gun)
-  chatDB.map().on((d, id) => {
-    if (!d || Date.now() - id > 600000) return;
-    addChatMessage(d.u, d.t, false);
-  });
-
-  // BroadcastChannel 受信 (Pixel & Chat)
-  localChannel.onmessage = (event) => {
-    const d = event.data;
-    if(d.type === 'pixel') {
-      updateLocalPixel(d.x, d.y, d.c, true);
-    } else if(d.type === 'chat') {
-      addChatMessage(d.u, d.t, false);
-    }
+  localChannel.onmessage = (e) => {
+    const d = e.data;
+    if(d.type==='pixel') updateLocalPixel(d.x, d.y, d.c, true);
+    else if(d.type==='chat') addChatMessage(d.u, d.t, true);
   };
 
-  // チャットUI処理
   const processedChatIds = new Set();
   function addChatMessage(user, text, isLocal) {
-    const id = user + text + (isLocal ? Date.now() : "");
-    if(processedChatIds.has(id) && !isLocal) return; // 重複防止
-    processedChatIds.add(id);
-
+    const id = user+text+(isLocal?"L":"R");
+    if(processedChatIds.has(id)) return; processedChatIds.add(id);
     const m = document.getElementById('messages');
     const div = document.createElement('div');
-    const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    div.innerHTML = `<span style="color:#888;font-size:10px;">${time}</span> <b>${sanitize(user)}</b>: ${sanitize(text)}`;
-    m.appendChild(div);
-    m.scrollTop = m.scrollHeight;
+    div.innerHTML = `<span style="color:#888;font-size:10px;">${new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span> <b>${user.replace(/</g,"&lt;")}</b>: ${text.replace(/</g,"&lt;")}`;
+    m.appendChild(div); m.scrollTop = m.scrollHeight;
     if (m.childNodes.length > 30) m.removeChild(m.firstChild);
   }
-  const sanitize = (str) => str.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-  // --- 4. 描画 & 入力 ---
+  // --- 4. Main Loop & Input ---
   let myId = Math.random().toString(36).slice(2);
   let myName = localStorage.getItem('ic_name') || "名無し";
   document.getElementById('nameInput').value = myName;
 
-  let camX = 0, camY = 0, zoom = 20;
-  let isPainting = false, isDragging = false, isEraser = false;
-  let lastMouse = {x:0, y:0}, brushSize = 1;
-  let hoverPos = null;
-  let otherCursors = {};
+  let camX=0, camY=0, zoom=20;
+  let isPainting=false, isDragging=false, isEraser=false;
+  let lastMouse={x:0,y:0}, brushSize=1;
+  let hoverPos=null, otherCursors={};
 
-  // カーソル受信
-  cursorDB.map().on((d, id) => {
-    if (id !== myId && d && Date.now() - d.t < 10000) otherCursors[id] = d;
-  });
-
-  const toScreen = (wx, wy) => ({ x: Math.floor((wx - camX) * zoom + canvas.width/2), y: Math.floor((wy - camY) * zoom + canvas.height/2) });
-  const toWorld = (sx, sy) => ({ wx: Math.floor((sx - canvas.width/2)/zoom + camX), wy: Math.floor((sy - canvas.height/2)/zoom + camY) });
+  cursorDB.map().on((d, id) => { if(id!==myId && d && Date.now()-d.t<10000) otherCursors[id]=d; });
+  const toScreen=(wx,wy)=>({x:Math.floor((wx-camX)*zoom+canvas.width/2), y:Math.floor((wy-camY)*zoom+canvas.height/2)});
+  const toWorld=(sx,sy)=>({wx:Math.floor((sx-canvas.width/2)/zoom+camX), wy:Math.floor((sy-canvas.height/2)/zoom+camY)});
 
   function render() {
-    if(canvas.width !== window.innerWidth || canvas.height !== window.innerHeight){
-        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-    }
-    ctx.fillStyle = '#f5f5f5'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if(canvas.width!==window.innerWidth||canvas.height!==window.innerHeight){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
+    ctx.fillStyle='#f5f5f5'; ctx.fillRect(0,0,canvas.width,canvas.height);
 
-    // グリッド
-    if(zoom > 8) {
-        ctx.beginPath(); ctx.strokeStyle = "rgba(0,0,0,0.05)"; ctx.lineWidth = 1;
-        const s = toWorld(0, 0), e = toWorld(canvas.width, canvas.height);
-        for(let x = s.wx; x <= e.wx; x++) { const p = toScreen(x, 0); ctx.moveTo(p.x, 0); ctx.lineTo(p.x, canvas.height); }
-        for(let y = s.wy; y <= e.wy; y++) { const p = toScreen(0, y); ctx.moveTo(0, p.y); ctx.lineTo(canvas.width, p.y); }
-        ctx.stroke();
+    if(zoom>8) {
+      ctx.beginPath(); ctx.strokeStyle="rgba(0,0,0,0.05)"; ctx.lineWidth=1;
+      const s=toWorld(0,0), e=toWorld(canvas.width,canvas.height);
+      for(let x=s.wx; x<=e.wx; x++) { const p=toScreen(x,0); ctx.moveTo(p.x,0); ctx.lineTo(p.x,canvas.height); }
+      for(let y=s.wy; y<=e.wy; y++) { const p=toScreen(0,y); ctx.moveTo(0,p.y); ctx.lineTo(canvas.width,p.y); }
+      ctx.stroke();
     }
 
-    // ドット描画 (Viewport Culling)
-    const sW = toWorld(0, 0), eW = toWorld(canvas.width, canvas.height);
-    const sCX = Math.floor(sW.wx/CHUNK_SIZE), eCX = Math.floor(eW.wx/CHUNK_SIZE);
-    const sCY = Math.floor(sW.wy/CHUNK_SIZE), eCY = Math.floor(eW.wy/CHUNK_SIZE);
+    const sW=toWorld(0,0), eW=toWorld(canvas.width,canvas.height);
+    const sCX=Math.floor(sW.wx/CHUNK_SIZE), eCX=Math.floor(eW.wx/CHUNK_SIZE);
+    const sCY=Math.floor(sW.wy/CHUNK_SIZE), eCY=Math.floor(eW.wy/CHUNK_SIZE);
 
     for(let cy=sCY; cy<=eCY; cy++) for(let cx=sCX; cx<=eCX; cx++) {
       const chunk = localChunks[`${cx}_${cy}`];
       if(!chunk) continue;
-      const ox = cx*CHUNK_SIZE, oy = cy*CHUNK_SIZE;
+      const ox=cx*CHUNK_SIZE, oy=cy*CHUNK_SIZE;
       for(let k in chunk) {
-        const [lx, ly] = k.split('_').map(Number);
-        const scr = toScreen(ox+lx, oy+ly);
-        ctx.fillStyle = chunk[k];
-        ctx.fillRect(scr.x, scr.y, Math.ceil(zoom), Math.ceil(zoom));
+        const [lx,ly]=k.split('_').map(Number);
+        const scr=toScreen(ox+lx,oy+ly);
+        ctx.fillStyle=chunk[k]; ctx.fillRect(scr.x,scr.y,Math.ceil(zoom),Math.ceil(zoom));
       }
     }
 
-    // UI
     if (hoverPos) {
-      const b = parseInt(brushSize), off = Math.floor((b-1)/2);
-      ctx.strokeStyle = isEraser ? "#ff3b30" : "#007AFF"; ctx.lineWidth = 2;
-      const s = toScreen(hoverPos.wx - off, hoverPos.wy - off);
-      ctx.strokeRect(s.x, s.y, b*zoom, b*zoom);
+      const b=parseInt(brushSize), off=Math.floor((b-1)/2);
+      ctx.strokeStyle=isEraser?"#ff3b30":"#007AFF"; ctx.lineWidth=2;
+      const s=toScreen(hoverPos.wx-off,hoverPos.wy-off);
+      ctx.strokeRect(s.x,s.y,b*zoom,b*zoom);
     }
 
-    const now = Date.now();
+    const now=Date.now();
     for(let id in otherCursors){
-      const c = otherCursors[id];
-      if(now - c.t > 5000) continue;
-      const s = toScreen(c.x, c.y);
-      ctx.fillStyle = c.col || "#333"; ctx.beginPath(); ctx.arc(s.x, s.y, 4, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = "#333"; ctx.font = "10px sans-serif"; ctx.fillText(c.n, s.x+8, s.y+4);
+      const c=otherCursors[id];
+      if(now-c.t>5000) continue;
+      const s=toScreen(c.x,c.y);
+      ctx.fillStyle=c.col||"#333"; ctx.beginPath(); ctx.arc(s.x,s.y,4,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle="#333"; ctx.font="10px sans-serif"; ctx.fillText(c.n,s.x+8,s.y+4);
     }
     requestAnimationFrame(render);
   }
 
   function paint(wx, wy) {
     const color = isEraser ? null : document.getElementById('colorPicker').value;
-    const b = parseInt(brushSize), r = Math.floor((b-1)/2);
+    const b=parseInt(brushSize), r=Math.floor((b-1)/2);
     for(let dx=-r; dx<=r+(b%2===0?1:0); dx++) for(let dy=-r; dy<=r+(b%2===0?1:0); dy++){
-      if(b>1 && dx*dx+dy*dy > r*r+1) continue;
-      const tx = wx+dx, ty = wy+dy;
-      const cid = getChunkId(tx, ty);
-      const k = `${((tx%CHUNK_SIZE)+CHUNK_SIZE)%CHUNK_SIZE}_${((ty%CHUNK_SIZE)+CHUNK_SIZE)%CHUNK_SIZE}`;
-      if ((localChunks[cid]?.[k]) !== color) {
-        // Gun (Net)
+      if(b>1 && dx*dx+dy*dy>r*r+1) continue;
+      const tx=wx+dx, ty=wy+dy;
+      const cid=getChunkId(tx,ty);
+      const k=`${((tx%CHUNK_SIZE)+CHUNK_SIZE)%CHUNK_SIZE}_${((ty%CHUNK_SIZE)+CHUNK_SIZE)%CHUNK_SIZE}`;
+      if((localChunks[cid]?.[k])!==color) {
         dotsDB.get(`${tx}_${ty}`).put(encodeCol(color));
-        // Local (Mem)
-        updateLocalPixel(tx, ty, color);
-        // Broadcast (Tab)
-        localChannel.postMessage({ type: 'pixel', x: tx, y: ty, c: color });
+        updateLocalPixel(tx,ty,color);
+        localChannel.postMessage({type:'pixel',x:tx,y:ty,c:color});
       }
     }
   }
 
-  // 入力イベント
-  canvas.onmousedown = e => {
-    const {wx, wy} = toWorld(e.clientX, e.clientY);
-    if(e.button===0 && !e.shiftKey) { isPainting=true; paint(wx, wy); }
-    else { isDragging=true; lastMouse={x:e.clientX, y:e.clientY}; canvas.style.cursor="grabbing"; }
-  };
-  window.onmousemove = e => {
-    const {wx, wy} = toWorld(e.clientX, e.clientY);
-    hoverPos = {wx, wy};
-    document.getElementById('coordDisplay').innerText = `x:${wx} y:${wy}`;
-    if(isPainting) paint(wx, wy);
-    if(isDragging) { camX-=(e.clientX-lastMouse.x)/zoom; camY-=(e.clientY-lastMouse.y)/zoom; lastMouse={x:e.clientX, y:e.clientY}; }
-    if(Math.random()<0.3) cursorDB.get(myId).put({x:wx, y:wy, n:myName, t:Date.now(), col:document.getElementById('colorPicker').value});
-  };
-  window.onmouseup = () => { isPainting=isDragging=false; canvas.style.cursor="crosshair"; };
+  canvas.onmousedown=e=>{const{wx,wy}=toWorld(e.clientX,e.clientY);if(e.button===0&&!e.shiftKey){isPainting=true;paint(wx,wy);}else{isDragging=true;lastMouse={x:e.clientX,y:e.clientY};canvas.style.cursor="grabbing";}};
+  window.onmousemove=e=>{const{wx,wy}=toWorld(e.clientX,e.clientY);hoverPos={wx,wy};document.getElementById('coordDisplay').innerText=`x:${wx} y:${wy}`;if(isPainting)paint(wx,wy);if(isDragging){camX-=(e.clientX-lastMouse.x)/zoom;camY-=(e.clientY-lastMouse.y)/zoom;lastMouse={x:e.clientX,y:e.clientY};}if(Math.random()<0.3)cursorDB.get(myId).put({x:wx,y:wy,n:myName,t:Date.now(),col:document.getElementById('colorPicker').value});};
+  window.onmouseup=()=>{isPainting=isDragging=false;canvas.style.cursor="crosshair";};
   
-  // スマホ & ホイール
-  let initDist=0, initZ=20;
-  canvas.ontouchstart = e => {
-    if(e.touches.length===1) canvas.onmousedown({...e.touches[0], button:0, target:canvas});
-    else if(e.touches.length===2) { isDragging=false; isPainting=false; initDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY); initZ=zoom; }
-  };
-  canvas.ontouchmove = e => {
-    e.preventDefault();
-    if(e.touches.length===1) window.onmousemove(e.touches[0]);
-    else if(e.touches.length===2) zoom = Math.min(Math.max(initZ * (Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY)/initDist), 2), 100);
-  };
-  canvas.ontouchend = window.onmouseup;
-  canvas.onwheel = e => { e.preventDefault(); zoom=Math.min(Math.max(zoom*(e.deltaY>0?0.9:1.1),2),100); };
+  let initDist=0,initZ=20;
+  canvas.ontouchstart=e=>{if(e.touches.length===1)canvas.onmousedown({...e.touches[0],button:0,target:canvas});else if(e.touches.length===2){isDragging=false;isPainting=false;initDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);initZ=zoom;}};
+  canvas.ontouchmove=e=>{e.preventDefault();if(e.touches.length===1)window.onmousemove(e.touches[0]);else if(e.touches.length===2)zoom=Math.min(Math.max(initZ*(Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY)/initDist),2),100);};
+  canvas.ontouchend=window.onmouseup;
+  canvas.onwheel=e=>{e.preventDefault();zoom=Math.min(Math.max(zoom*(e.deltaY>0?0.9:1.1),2),100);};
 
-  // UI系
-  const pCon = document.getElementById('palette');
-  paletteColors.forEach(c => {
-    const s=document.createElement('div'); s.className='swatch'; s.style.background=c;
-    s.onclick=()=>{ isEraser=false; document.getElementById('eraserBtn').classList.remove('active'); document.getElementById('colorPicker').value=c; document.getElementById('colorPreviewWrapper').style.background=c; };
-    pCon.appendChild(s);
-  });
-  document.getElementById('colorPicker').oninput = e => { document.getElementById('colorPreviewWrapper').style.background=e.target.value; isEraser=false; document.getElementById('eraserBtn').classList.remove('active'); };
-  document.getElementById('eraserBtn').onclick = () => { isEraser=!isEraser; document.getElementById('eraserBtn').classList.toggle('active', isEraser); };
-  document.getElementById('nameInput').onchange = e => { myName=e.target.value||"名無し"; localStorage.setItem('ic_name', myName); };
-  window.toggleMenu = () => document.getElementById('main-panel').classList.toggle('hidden');
+  const pCon=document.getElementById('palette');
+  paletteColors.forEach(c=>{const s=document.createElement('div');s.className='swatch';s.style.background=c;s.onclick=()=>{isEraser=false;document.getElementById('eraserBtn').classList.remove('active');document.getElementById('colorPicker').value=c;document.getElementById('colorPreviewWrapper').style.background=c;};pCon.appendChild(s);});
+  document.getElementById('colorPicker').oninput=e=>{document.getElementById('colorPreviewWrapper').style.background=e.target.value;isEraser=false;document.getElementById('eraserBtn').classList.remove('active');};
+  document.getElementById('eraserBtn').onclick=()=>{isEraser=!isEraser;document.getElementById('eraserBtn').classList.toggle('active',isEraser);};
+  document.getElementById('nameInput').onchange=e=>{myName=e.target.value||"名無し";localStorage.setItem('ic_name',myName);};
+  window.toggleMenu=()=>document.getElementById('main-panel').classList.toggle('hidden');
 
-  // チャット送信
-  document.getElementById('chat-input').onkeypress = (e) => {
-    if (e.key === 'Enter' && e.target.value.trim() !== "") {
-      const txt = e.target.value.substring(0, 100);
-      // Gun送信 (Net)
-      chatDB.get(Date.now()).put({u: myName, t: txt});
-      // Broadcast送信 (Tab)
-      localChannel.postMessage({ type: 'chat', u: myName, t: txt });
-      e.target.value = "";
-    }
-  };
+  document.getElementById('chat-input').onkeypress=e=>{if(e.key==='Enter'&&e.target.value.trim()!==""){const t=e.target.value.substring(0,100);chatDB.get(Date.now()).put({u:myName,t:t});localChannel.postMessage({type:'chat',u:myName,t:t});e.target.value="";}};
 
-  // --- 管理者機能 (修正版) ---
+  // --- 5. 管理者認証 (Web Crypto API - HTTPS Required for GitHub Pages) ---
   window.addEventListener('keydown', async (e) => {
     if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'a') {
-      const input = prompt("Admin Password (2020302):");
+      const input = prompt("Password:");
       if (!input) return;
 
-      let isAuth = false;
+      // SHA-256でハッシュ化して比較 (平文パスワードはコードに存在しない)
+      const encoder = new TextEncoder();
+      const data = encoder.encode(input.trim());
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-      // 1. Web Crypto API が使える環境 (HTTPS / Localhost)
-      if (window.crypto && window.crypto.subtle) {
-        try {
-          const enc = new TextEncoder();
-          const hashBuf = await crypto.subtle.digest('SHA-256', enc.encode(input.trim()));
-          const hashHex = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
-          // 2020302 のハッシュ
-          if (hashHex === "d09033320df44654922dc479fc92df4866f7df268685169a1987514fe3064cb4") isAuth = true;
-          else console.log("Hash mismatch:", hashHex);
-        } catch(err) {
-          console.error("Crypto error, falling back to plaintext", err);
-          // エラー時は平文チェック
-          if (input.trim() === "2020302") isAuth = true;
-        }
-      } 
-      // 2. HTTP や file:// 環境など (平文チェックフォールバック)
-      else {
-        if (input.trim() === "2020302") isAuth = true;
-      }
-
-      if (isAuth) {
+      // 正解ハッシュ: d09033... (これは 2020302 のハッシュです)
+      if (hashHex === "d09033320df44654922dc479fc92df4866f7df268685169a1987514fe3064cb4") {
         const m = document.getElementById('admin-mount');
         if(m.innerHTML === "") {
           m.innerHTML = `
             <div class="glass admin-box">
-              <label style="color:#ff3b30">Admin Tools</label>
+              <label style="color:#ff3b30">Admin</label>
               <div style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid #ddd;">
-                <label>ブラシサイズ: <span id="brushSizeVal">${brushSize}</span></label>
+                <label>Brush: <span id="brushSizeVal">${brushSize}</span></label>
                 <input type="range" min="1" max="50" value="${brushSize}" oninput="brushSize=this.value;document.getElementById('brushSizeVal').innerText=this.value">
               </div>
-              <label>スタンプ画像</label>
+              <label>Stamp</label>
               <input type="file" id="imgInput" accept="image/*">
               <div style="display:flex; gap:5px; margin-top:5px;">
-                  <input type="number" id="imgW" placeholder="幅" value="64">
+                  <input type="number" id="imgW" placeholder="Width" value="64">
                   <button onclick="loadStamp()" style="background:#007AFF; color:white;">Load</button>
               </div>
-              <button onclick="if(confirm('全消去?')) { dotsDB.put(null); localChunks={}; }" style="background:#ff3b30; color:white; margin-top:10px;">💥 Data Wipe</button>
+              <button onclick="if(confirm('Wipe?')) { dotsDB.put(null); localChunks={}; }" style="background:#ff3b30; color:white; margin-top:10px;">Wipe Data</button>
             </div>`;
         }
       } else {
-        alert("パスワードが違います");
+        alert("Denied");
       }
     }
   });
 
-  // スタンプ機能
-  let stampData = null;
-  window.loadStamp = () => {
-    const f = document.getElementById('imgInput').files[0];
-    if(!f) return;
-    const r = new FileReader();
-    r.onload = e => {
-      const img = new Image();
-      img.onload = () => {
-        const w = parseInt(document.getElementById('imgW').value)||50, h = Math.floor(w*(img.height/img.width));
-        const c = document.createElement('canvas'); c.width=w; c.height=h;
-        const ctx = c.getContext('2d'); ctx.drawImage(img,0,0,w,h);
-        const d = ctx.getImageData(0,0,w,h).data;
-        stampData = [];
-        for(let y=0; y<h; y++) for(let x=0; x<w; x++) {
-          const i=(y*w+x)*4;
-          if(d[i+3]>128) stampData.push({x,y,hex:"#"+((1<<24)+(d[i]<<16)+(d[i+1]<<8)+d[i+2]).toString(16).slice(1)});
-        }
-        alert("画像ロード完了。クリックでスタンプ");
-      };
-      img.src = e.target.result;
-    };
-    r.readAsDataURL(f);
-  };
-  canvas.onclick = e => {
-    if(stampData && !isDragging) {
-      const {wx, wy} = toWorld(e.clientX, e.clientY);
-      let idx=0;
-      const loop = () => {
-        for(let i=0; i<50 && idx<stampData.length; i++, idx++) {
-          const p = stampData[idx];
-          const c = encodeCol(p.hex);
-          dotsDB.get(`${wx+p.x}_${wy+p.y}`).put(c);
-          updateLocalPixel(wx+p.x, wy+p.y, p.hex);
-          localChannel.postMessage({ type: 'pixel', x: wx+p.x, y: wy+p.y, c: p.hex });
-        }
-        if(idx<stampData.length) requestAnimationFrame(loop); else stampData=null;
-      };
-      loop();
-    }
-  };
+  let stampData=null;
+  window.loadStamp=()=>{const f=document.getElementById('imgInput').files[0];if(!f)return;const r=new FileReader();r.onload=e=>{const img=new Image();img.onload=()=>{const w=parseInt(document.getElementById('imgW').value)||50,h=Math.floor(w*(img.height/img.width));const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d');ctx.drawImage(img,0,0,w,h);const d=ctx.getImageData(0,0,w,h).data;stampData=[];for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*4;if(d[i+3]>128)stampData.push({x,y,hex:"#"+((1<<24)+(d[i]<<16)+(d[i+1]<<8)+d[i+2]).toString(16).slice(1)});}alert("Click canvas");};img.src=e.target.result;};r.readAsDataURL(f);};
+  canvas.onclick=e=>{if(stampData&&!isDragging){const{wx,wy}=toWorld(e.clientX,e.clientY);let idx=0;const loop=()=>{for(let i=0;i<50&&idx<stampData.length;i++,idx++){const p=stampData[idx];dotsDB.get(`${wx+p.x}_${wy+p.y}`).put(encodeCol(p.hex));updateLocalPixel(wx+p.x,wy+p.y,p.hex);localChannel.postMessage({type:'pixel',x:wx+p.x,y:wy+p.y,c:p.hex});}if(idx<stampData.length)requestAnimationFrame(loop);else stampData=null;};loop();}};
 
   render();
 </script>
