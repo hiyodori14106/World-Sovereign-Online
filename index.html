@@ -1,281 +1,574 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Infinite Canvas Ultimate</title>
-    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
-    <style>
-        :root { --primary: #007AFF; --bg: #ffffff; --ui-bg: rgba(255, 255, 255, 0.85); --text: #333; --shadow: 0 8px 32px rgba(0,0,0,0.1); }
-        body { margin: 0; overflow: hidden; background: var(--bg); font-family: -apple-system, sans-serif; color: var(--text); touch-action: none; }
-        canvas { display: block; cursor: crosshair; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>無限キャンバス Pro - Pantry Sync</title>
+  <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+  <style>
+    :root {
+      --primary: #007AFF;
+      --bg: #f0f2f5;
+      --ui-bg: rgba(255, 255, 255, 0.95);
+      --text: #1d1d1f;
+      --shadow: 0 8px 32px rgba(0,0,0,0.12);
+      --radius: 16px;
+    }
 
-        /* UI Layer */
-        #ui-layer { position: fixed; top: 10px; left: 10px; width: 280px; pointer-events: none; z-index: 100; display: flex; flex-direction: column; gap: 10px; }
-        .glass { background: var(--ui-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.4); border-radius: 20px; box-shadow: var(--shadow); pointer-events: auto; padding: 15px; }
-        
-        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        h2 { margin: 0; font-size: 16px; font-weight: 700; }
-        .status-tag { font-size: 9px; font-weight: bold; padding: 4px 10px; border-radius: 20px; background: rgba(0,0,0,0.05); display: flex; align-items: center; gap: 4px; }
-        .dot { width: 6px; height: 6px; border-radius: 50%; background: #ccc; }
-        .dot.online { background: #34C759; box-shadow: 0 0 8px #34C759; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      touch-action: none;
+    }
 
-        label { display: block; font-size: 9px; font-weight: 700; color: #999; margin-bottom: 4px; text-transform: uppercase; }
-        input, select, button { width: 100%; border: none; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 10px; font-size: 13px; outline: none; box-sizing: border-box; }
+    canvas { display: block; cursor: crosshair; background: white; }
 
-        /* Palette */
-        .brush-section { display: flex; align-items: center; gap: 10px; margin: 5px 0; }
-        #colorPreview { width: 44px; height: 44px; border-radius: 12px; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); position: relative; overflow: hidden; flex-shrink: 0; }
-        #colorPicker { position: absolute; top: -5px; left: -5px; width: 60px; height: 60px; cursor: pointer; opacity: 0; }
-        .palette { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; flex-grow: 1; }
-        .swatch { aspect-ratio: 1; border-radius: 5px; cursor: pointer; border: 1.5px solid transparent; }
-        .swatch.active { border-color: var(--primary); transform: scale(1.1); }
+    /* UI Layout */
+    #ui-container {
+      position: fixed; top: 10px; left: 10px; z-index: 100;
+      display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+      max-height: 90vh; pointer-events: none;
+    }
 
-        /* Admin Box */
-        .admin-box { border: 2px solid #ff3b30; background: rgba(255, 235, 235, 0.9); display: block; margin-top: 10px; }
-        .admin-btn { background: #007AFF; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 8px; font-weight: bold; }
-        .danger-btn { background: #ff3b30; }
+    .glass {
+      background: var(--ui-bg);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.4); border-radius: var(--radius);
+      box-shadow: var(--shadow); pointer-events: auto;
+      padding: 14px; box-sizing: border-box;
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
 
-        /* Chat */
-        #chat-container { position: fixed; bottom: 10px; left: 10px; width: 300px; max-height: 150px; overflow: hidden; padding: 0; }
-        #messages { flex: 1; overflow-y: auto; padding: 10px; font-size: 11px; display: flex; flex-direction: column; gap: 4px; }
-        .msg { background: rgba(0,0,0,0.03); padding: 5px 10px; border-radius: 8px; }
-        #chat-input { background: transparent; border-top: 1px solid rgba(0,0,0,0.05); width: 100%; }
+    #menu-toggle {
+      width: 40px; height: 40px; border-radius: 50%; border: none;
+      background: var(--text); color: white; font-size: 20px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      pointer-events: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
 
-        .cursor-label { position: fixed; pointer-events: none; background: #000; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 10px; transform: translate(10px, 10px); }
-        .guide { font-size: 9px; color: #999; margin-top: 10px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 8px; }
-    </style>
+    #main-panel {
+      width: 280px; display: flex; flex-direction: column; gap: 12px;
+      transform-origin: top left;
+    }
+    #main-panel.hidden { transform: scale(0.9); opacity: 0; pointer-events: none; position: absolute; top: 50px; }
+
+    h2 { margin: 0 0 4px; font-size: 16px; font-weight: 800; letter-spacing: -0.5px; }
+    .status { font-size: 10px; color: #888; margin-bottom: 8px; display:flex; justify-content:space-between; }
+    
+    label { display: block; font-size: 11px; font-weight: 600; color: #666; margin-bottom: 4px; }
+    input[type="text"], input[type="number"], button {
+      width: 100%; border: none; background: rgba(0,0,0,0.06); 
+      padding: 8px 10px; border-radius: 8px; font-size: 13px; 
+      outline: none; box-sizing: border-box; color: var(--text);
+    }
+    
+    .tool-row { display: flex; gap: 10px; align-items: stretch; }
+    
+    #colorPreviewWrapper {
+      width: 50px; height: 50px; border-radius: 10px; 
+      overflow: hidden; position: relative; border: 2px solid rgba(0,0,0,0.1);
+      flex-shrink: 0;
+    }
+    #colorPicker {
+      position: absolute; top: -10px; left: -10px; width: 80px; height: 80px; 
+      padding: 0; border: none; cursor: pointer;
+    }
+    
+    #eraserBtn {
+      flex: 1; border-radius: 10px; background: white; border: 1px solid rgba(0,0,0,0.1);
+      cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px;
+    }
+    #eraserBtn.active { background: #333; color: white; border-color: #333; }
+
+    .palette { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 4px; }
+    .swatch { aspect-ratio: 1; border-radius: 6px; cursor: pointer; border: 1px solid rgba(0,0,0,0.05); }
+
+    #chat-container {
+      position: fixed; bottom: 15px; right: 15px; width: 280px;
+      max-width: calc(100vw - 30px); z-index: 100; padding: 0;
+      display: flex; flex-direction: column;
+    }
+    .chat-header {
+      padding: 10px 14px; font-size: 12px; font-weight: bold; border-bottom: 1px solid rgba(0,0,0,0.05);
+      background: rgba(255,255,255,0.5); cursor: pointer;
+    }
+    #messages {
+      height: 140px; overflow-y: auto; padding: 10px; font-size: 12px;
+      display: flex; flex-direction: column; gap: 4px; scroll-behavior: smooth;
+    }
+    #messages div { word-break: break-all; line-height: 1.4; }
+    #chat-input {
+      background: transparent; border-top: 1px solid rgba(0,0,0,0.1);
+      border-radius: 0 0 var(--radius) var(--radius); padding: 12px;
+    }
+    
+    .admin-box { 
+      border: 2px solid #ff3b30; margin-top: 10px; background: rgba(255, 59, 48, 0.05); 
+    }
+  </style>
 </head>
 <body>
 
-<div id="ui-layer">
-    <div class="glass">
-        <div class="header-row">
-            <h2 id="t-title">Infinite Canvas</h2>
-            <div class="status-tag"><div id="status-dot" class="dot"></div><span id="t-status">...</span></div>
-        </div>
-        <div style="display:flex; gap:10px; margin-bottom:10px;">
-            <div style="flex:1"><label id="t-label-lang">LANG</label><select id="langSelect"><option value="en">EN</option><option value="ja">JA</option></select></div>
-            <div style="flex:2"><label id="t-label-name">NAME</label><input type="text" id="nameInput"></div>
-        </div>
-        <div>
-            <label id="t-label-color">COLOR</label>
-            <div class="brush-section">
-                <div id="colorPreview"><input type="color" id="colorPicker" value="#007AFF"></div>
-                <div id="palette" class="palette"></div>
-            </div>
-            <div id="admin-brush-ui" style="display:none; margin-top:5px;">
-                <label>BRUSH SIZE: <span id="brushSizeVal">1</span></label>
-                <input type="range" id="brushSizeInput" min="1" max="20" value="1">
-            </div>
-        </div>
-        <div id="t-guide" class="guide"></div>
+<div id="ui-container">
+  <button id="menu-toggle" onclick="toggleMenu()">☰</button>
+  
+  <div id="main-panel" class="glass">
+    <div>
+      <h2>Infinite Canvas <span style="color:var(--primary)">Pro</span></h2>
+      <div class="status">
+        <span id="coordDisplay">x:0 y:0</span>
+        <span id="saveStatus">Syncing...</span>
+      </div>
     </div>
+
+    <div>
+      <label>名前</label>
+      <input type="text" id="nameInput" placeholder="名無しさん" maxlength="10">
+    </div>
+
+    <div class="tool-row" style="margin-top:8px;">
+      <div id="colorPreviewWrapper">
+        <input type="color" id="colorPicker" value="#007AFF">
+      </div>
+      <div id="eraserBtn" title="消しゴム">🧹</div>
+    </div>
+    
+    <div id="palette" class="palette"></div>
     <div id="admin-mount"></div>
+  </div>
 </div>
 
-<div id="chat-container" class="glass"><div id="messages"></div><input type="text" id="chat-input"></div>
+<div id="chat-container" class="glass">
+  <div class="chat-header" onclick="document.getElementById('messages').style.display = document.getElementById('messages').style.display==='none'?'flex':'none'">
+    💬 チャット (タップで開閉)
+  </div>
+  <div id="messages"></div>
+  <input type="text" id="chat-input" placeholder="メッセージを入力...">
+</div>
+
 <canvas id="gameCanvas"></canvas>
 
 <script>
-// --- 多言語設定 ---
-const i18n = {
-    en: { title: "Infinite Canvas", status: "Wait", live: "Live", name: "Name", color: "Color", lang: "Lang", chat: "Chat...", guide: "• <b>Left/1 Finger</b>: Paint<br>• <b>Right/2 Fingers</b>: Move" },
-    ja: { title: "無限キャンバス", status: "待機中", live: "ライブ", name: "名前", color: "色", lang: "言語", chat: "チャット...", guide: "• <b>左クリック/1本指</b>: 描く<br>• <b>右クリック/2本指</b>: 移動" }
-};
-function setLanguage(lang) {
-    const t = i18n[lang] || i18n.en;
-    document.getElementById('t-title').innerText = t.title;
-    document.getElementById('t-label-name').innerText = t.name;
-    document.getElementById('t-label-color').innerText = t.color;
-    document.getElementById('t-label-lang').innerText = t.lang;
-    document.getElementById('chat-input').placeholder = t.chat;
-    document.getElementById('t-guide').innerHTML = t.guide;
-    if (document.getElementById('status-dot').classList.contains('online')) document.getElementById('t-status').innerText = t.live;
-}
+  // --- 1. 設定 & 通信基盤 ---
+  const PANTRY_ID = "22d3843a-59e1-49f7-a005-0ae17aac5ce5";
+  const PANTRY_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/canvas_pixel_data`;
 
-// --- 管理者(2020302) ---
-const ADMIN_HASH = "3884b294060851f5c643b9e4073e51d951522f986427382d56d7827827e8a93a";
-async function sha256(m){const b=new TextEncoder().encode(m);const h=await crypto.subtle.digest('SHA-256',b);return Array.from(new Uint8Array(h)).map(x=>x.toString(16).padStart(2,'0')).join('');}
+  // ローカル同期用チャンネル (別タブ同期)
+  const localChannel = new BroadcastChannel('inf_canvas_sync_v7');
+  
+  // Gun.js (インターネット同期)
+  const gun = Gun({
+    peers: ['https://gun-manhattan.herokuapp.com/gun', 'https://peer.wall.org:443/gun'],
+    localStorage: true
+  });
+  
+  const APP_KEY = 'inf_canvas_v7_pantry';
+  const db = gun.get(APP_KEY);
+  const dotsDB = db.get('dots');
+  const chatDB = db.get('chat');
+  const cursorDB = db.get('cursors');
 
-// キーイベント判定の修正 (Shift+Ctrl+Alt+A)
-window.addEventListener('keydown', async (e) => {
-    if (e.shiftKey && e.ctrlKey && e.altKey && (e.key === 'a' || e.key === 'A' || e.keyCode === 65)) {
-        const p = prompt("Enter Admin Password:");
-        if (!p) return;
-        const hashed = await sha256(p);
-        if (hashed === ADMIN_HASH) {
-            activateAdmin();
-            alert("Admin Mode: Access Granted.");
-        } else {
-            alert("Access Denied.");
-        }
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d', { alpha: false });
+
+  // パレット & 圧縮用ユーティリティ
+  const paletteColors = [
+    "#000000", "#FFFFFF", "#FF3B30", "#FF9500", "#FFCC00", "#4CD964", 
+    "#5AC8FA", "#007AFF", "#5856D6", "#AF52DE", "#FF2D55", "#8E8E93",
+    "#607D8B", "#795548", "#E91E63"
+  ];
+  
+  const encodeCol = (c) => {
+    if(!c) return null;
+    const idx = paletteColors.indexOf(c.toUpperCase());
+    return idx !== -1 ? idx.toString(16) : c;
+  };
+  const decodeCol = (c) => {
+    if(!c) return null;
+    if(c.length <= 2 && /^[0-9A-Fa-f]+$/.test(c)) return paletteColors[parseInt(c, 16)] || c;
+    return c;
+  };
+
+  // --- 2. データ構造 & Pantry連携 ---
+  const CHUNK_SIZE = 16;
+  let localChunks = {}; 
+  // 全ドット数管理 (Pantry保存判定用)
+  let hasChanges = false;
+  let dotCount = 0;
+
+  const getChunkId = (wx, wy) => `${Math.floor(wx/CHUNK_SIZE)}_${Math.floor(wy/CHUNK_SIZE)}`;
+
+  const updateLocalPixel = (wx, wy, color, isSync = false) => {
+    const cid = getChunkId(wx, wy);
+    if (!localChunks[cid]) localChunks[cid] = {};
+    
+    const lx = ((wx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+    const ly = ((wy % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+    const key = `${lx}_${ly}`;
+
+    const old = localChunks[cid][key];
+    if (color === null) {
+      if(old) dotCount--;
+      delete localChunks[cid][key];
+      if (Object.keys(localChunks[cid]).length === 0) delete localChunks[cid];
+    } else {
+      if(!old) dotCount++;
+      localChunks[cid][key] = color;
     }
-});
+    if(!isSync) hasChanges = true;
+  };
 
-let pendingImage = null; 
+  // --- Pantry: 読み込み ---
+  async function loadFromPantry() {
+    try {
+      document.getElementById('saveStatus').innerText = "Loading Pantry...";
+      const res = await fetch(PANTRY_URL);
+      if(!res.ok) throw new Error("Pantry empty or error");
+      const json = await res.json();
+      
+      // データ形式: { "x_y": "hexIndex" }
+      const pixels = json.pixels || {};
+      let count = 0;
+      
+      // Gunからのデータ受信を待つため、少し遅延させるか、Gunにデータがない場合のみ反映
+      // ここではローカルステートにマージします
+      for(let key in pixels) {
+        const [x, y] = key.split('_').map(Number);
+        const col = decodeCol(pixels[key]);
+        updateLocalPixel(x, y, col, true);
+        count++;
+      }
+      document.getElementById('saveStatus').innerText = `Loaded ${count} dots`;
+    } catch(e) {
+      console.log("Pantry load skipped:", e);
+      document.getElementById('saveStatus').innerText = "Ready (New)";
+    }
+  }
 
-function activateAdmin() {
-    isAdmin = true;
-    document.getElementById('admin-brush-ui').style.display = 'block';
-    document.getElementById('admin-mount').innerHTML = `
-        <div class="glass admin-box">
-            <h2 style="color:#d00;">GOD MODE</h2>
-            <label>IMPORT IMAGE</label><input type="file" id="imageInput" accept="image/*">
-            <label style="margin-top:5px;">SIZE (px)</label><input type="number" id="imgSize" value="50">
-            <button class="admin-btn" onclick="saveToPantry()">FORCE SAVE</button>
-            <button class="admin-btn danger-btn" onclick="clearCanvas()">CLEAR WORLD</button>
-        </div>`;
-    setupAdminEvents();
-}
+  // 初回ロード実行（Gunのデータが来る前にベースとしてロード）
+  loadFromPantry();
 
-// --- 通信・ロジック ---
-const PANTRY_ID = "1236839c-7644-4b65-881d-e65dc707e34e"; 
-const PANTRY_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/world_data_v2`;
-const gun = Gun(['https://gun-manhattan.herokuapp.com/gun']);
-const db = gun.get('infinite_canvas_ultimate_v6'); // データ競合を避けるためバージョン上げ
-const dotsDB = db.get('dots'), cursorDB = db.get('cursors'), chatDB = db.get('chat');
+  // --- Pantry: 保存 (30秒間隔) ---
+  setInterval(async () => {
+    // 変更がない、またはドット数が少なすぎる場合は保存しない（API節約）
+    if(!hasChanges && dotCount > 0) return; 
 
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-let camX = 0, camY = 0, zoom = 15, myId = Math.random().toString(36).slice(2), myName = "Anon";
-let localDots = {}, isPainting = false, isDragging = false, lastP, brushSize = 1, isAdmin = false;
-let hoverPos = null;
-
-const toScreen = (wx, wy) => ({ x: (wx - camX) * zoom + canvas.width / 2, y: (wy - camY) * zoom + canvas.height / 2 });
-const toWorld = (sx, sy) => ({ wx: Math.floor((sx - canvas.width / 2) / zoom + camX), wy: Math.floor((sy - canvas.height / 2) / zoom + camY) });
-dotsDB.map().on((color, key) => { if (color) localDots[key] = color; else delete localDots[key]; });
-
-function render() {
-    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-    ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
-
-    for(let k in localDots){
-        const [x,y]=k.split(',').map(Number); const s=toScreen(x,y);
-        if(s.x>-zoom&&s.x<canvas.width&&s.y>-zoom&&s.y<canvas.height){ ctx.fillStyle=localDots[k]; ctx.fillRect(s.x,s.y,zoom+0.5,zoom+0.5); }
+    document.getElementById('saveStatus').innerText = "Saving to Pantry...";
+    
+    // データをフラット化して最小化
+    const flatData = {};
+    for(let cid in localChunks) {
+      const [cx, cy] = cid.split('_').map(Number);
+      const chunk = localChunks[cid];
+      for(let k in chunk) {
+        const [lx, ly] = k.split('_').map(Number);
+        const wx = cx * CHUNK_SIZE + lx;
+        const wy = cy * CHUNK_SIZE + ly;
+        flatData[`${wx}_${wy}`] = encodeCol(chunk[k]);
+      }
     }
 
-    // ガイド描画
+    try {
+      await fetch(PANTRY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          pixels: flatData, 
+          updated: Date.now() 
+        })
+      });
+      document.getElementById('saveStatus').innerText = "Saved to Pantry";
+      hasChanges = false;
+    } catch(e) {
+      document.getElementById('saveStatus').innerText = "Save Failed";
+      console.error(e);
+    }
+  }, 30000); // 30秒
+
+  // --- 3. リアルタイム通信 (Gun + Broadcast) ---
+  
+  // ドット受信
+  dotsDB.map().on((data, key) => {
+    const [x, y] = key.split('_').map(Number);
+    if (isNaN(x) || isNaN(y)) return;
+    const col = decodeCol(data);
+    updateLocalPixel(x, y, col, true);
+  });
+
+  // チャット受信 (Gun)
+  chatDB.map().on((d, id) => {
+    if (!d || Date.now() - id > 600000) return;
+    addChatMessage(d.u, d.t, false);
+  });
+
+  // BroadcastChannel 受信 (Pixel & Chat)
+  localChannel.onmessage = (event) => {
+    const d = event.data;
+    if(d.type === 'pixel') {
+      updateLocalPixel(d.x, d.y, d.c, true);
+    } else if(d.type === 'chat') {
+      addChatMessage(d.u, d.t, false);
+    }
+  };
+
+  // チャットUI処理
+  const processedChatIds = new Set();
+  function addChatMessage(user, text, isLocal) {
+    const id = user + text + (isLocal ? Date.now() : "");
+    if(processedChatIds.has(id) && !isLocal) return; // 重複防止
+    processedChatIds.add(id);
+
+    const m = document.getElementById('messages');
+    const div = document.createElement('div');
+    const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    div.innerHTML = `<span style="color:#888;font-size:10px;">${time}</span> <b>${sanitize(user)}</b>: ${sanitize(text)}`;
+    m.appendChild(div);
+    m.scrollTop = m.scrollHeight;
+    if (m.childNodes.length > 30) m.removeChild(m.firstChild);
+  }
+  const sanitize = (str) => str.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  // --- 4. 描画 & 入力 ---
+  let myId = Math.random().toString(36).slice(2);
+  let myName = localStorage.getItem('ic_name') || "名無し";
+  document.getElementById('nameInput').value = myName;
+
+  let camX = 0, camY = 0, zoom = 20;
+  let isPainting = false, isDragging = false, isEraser = false;
+  let lastMouse = {x:0, y:0}, brushSize = 1;
+  let hoverPos = null;
+  let otherCursors = {};
+
+  // カーソル受信
+  cursorDB.map().on((d, id) => {
+    if (id !== myId && d && Date.now() - d.t < 10000) otherCursors[id] = d;
+  });
+
+  const toScreen = (wx, wy) => ({ x: Math.floor((wx - camX) * zoom + canvas.width/2), y: Math.floor((wy - camY) * zoom + canvas.height/2) });
+  const toWorld = (sx, sy) => ({ wx: Math.floor((sx - canvas.width/2)/zoom + camX), wy: Math.floor((sy - canvas.height/2)/zoom + camY) });
+
+  function render() {
+    if(canvas.width !== window.innerWidth || canvas.height !== window.innerHeight){
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    }
+    ctx.fillStyle = '#f5f5f5'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // グリッド
+    if(zoom > 8) {
+        ctx.beginPath(); ctx.strokeStyle = "rgba(0,0,0,0.05)"; ctx.lineWidth = 1;
+        const s = toWorld(0, 0), e = toWorld(canvas.width, canvas.height);
+        for(let x = s.wx; x <= e.wx; x++) { const p = toScreen(x, 0); ctx.moveTo(p.x, 0); ctx.lineTo(p.x, canvas.height); }
+        for(let y = s.wy; y <= e.wy; y++) { const p = toScreen(0, y); ctx.moveTo(0, p.y); ctx.lineTo(canvas.width, p.y); }
+        ctx.stroke();
+    }
+
+    // ドット描画 (Viewport Culling)
+    const sW = toWorld(0, 0), eW = toWorld(canvas.width, canvas.height);
+    const sCX = Math.floor(sW.wx/CHUNK_SIZE), eCX = Math.floor(eW.wx/CHUNK_SIZE);
+    const sCY = Math.floor(sW.wy/CHUNK_SIZE), eCY = Math.floor(eW.wy/CHUNK_SIZE);
+
+    for(let cy=sCY; cy<=eCY; cy++) for(let cx=sCX; cx<=eCX; cx++) {
+      const chunk = localChunks[`${cx}_${cy}`];
+      if(!chunk) continue;
+      const ox = cx*CHUNK_SIZE, oy = cy*CHUNK_SIZE;
+      for(let k in chunk) {
+        const [lx, ly] = k.split('_').map(Number);
+        const scr = toScreen(ox+lx, oy+ly);
+        ctx.fillStyle = chunk[k];
+        ctx.fillRect(scr.x, scr.y, Math.ceil(zoom), Math.ceil(zoom));
+      }
+    }
+
+    // UI
     if (hoverPos) {
-        ctx.fillStyle = "rgba(200, 200, 200, 0.5)";
-        if (pendingImage) {
-            const s = toScreen(hoverPos.wx, hoverPos.wy);
-            ctx.fillRect(s.x, s.y, pendingImage.w * zoom, pendingImage.h * zoom);
-        } else {
-            const r = Math.floor((brushSize - 1) / 2);
-            const s = toScreen(hoverPos.wx - r, hoverPos.wy - r);
-            ctx.fillRect(s.x, s.y, brushSize * zoom, brushSize * zoom);
-        }
+      const b = parseInt(brushSize), off = Math.floor((b-1)/2);
+      ctx.strokeStyle = isEraser ? "#ff3b30" : "#007AFF"; ctx.lineWidth = 2;
+      const s = toScreen(hoverPos.wx - off, hoverPos.wy - off);
+      ctx.strokeRect(s.x, s.y, b*zoom, b*zoom);
+    }
+
+    const now = Date.now();
+    for(let id in otherCursors){
+      const c = otherCursors[id];
+      if(now - c.t > 5000) continue;
+      const s = toScreen(c.x, c.y);
+      ctx.fillStyle = c.col || "#333"; ctx.beginPath(); ctx.arc(s.x, s.y, 4, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = "#333"; ctx.font = "10px sans-serif"; ctx.fillText(c.n, s.x+8, s.y+4);
     }
     requestAnimationFrame(render);
-}
+  }
 
-function paint(x, y) {
-    if (pendingImage) {
-        const s = toWorld(x, y);
-        pendingImage.data.forEach(p => dotsDB.get(`${s.wx + p.x},${s.wy + p.y}`).put(p.hex));
-        pendingImage = null;
-        return;
+  function paint(wx, wy) {
+    const color = isEraser ? null : document.getElementById('colorPicker').value;
+    const b = parseInt(brushSize), r = Math.floor((b-1)/2);
+    for(let dx=-r; dx<=r+(b%2===0?1:0); dx++) for(let dy=-r; dy<=r+(b%2===0?1:0); dy++){
+      if(b>1 && dx*dx+dy*dy > r*r+1) continue;
+      const tx = wx+dx, ty = wy+dy;
+      const cid = getChunkId(tx, ty);
+      const k = `${((tx%CHUNK_SIZE)+CHUNK_SIZE)%CHUNK_SIZE}_${((ty%CHUNK_SIZE)+CHUNK_SIZE)%CHUNK_SIZE}`;
+      if ((localChunks[cid]?.[k]) !== color) {
+        // Gun (Net)
+        dotsDB.get(`${tx}_${ty}`).put(encodeCol(color));
+        // Local (Mem)
+        updateLocalPixel(tx, ty, color);
+        // Broadcast (Tab)
+        localChannel.postMessage({ type: 'pixel', x: tx, y: ty, c: color });
+      }
     }
-    const pos = toWorld(x, y); const color = document.getElementById('colorPicker').value;
-    const r = Math.floor((brushSize - 1) / 2);
-    for(let dx = -r; dx <= r; dx++) for(let dy = -r; dy <= r; dy++) {
-        const k = `${pos.wx+dx},${pos.wy+dy}`; if (localDots[k]!==color) dotsDB.get(k).put(color);
-    }
-}
+  }
 
-canvas.onmousedown = (e) => {
-    if (e.button === 0) { isPainting = true; paint(e.clientX, e.clientY); }
-    else { isDragging = true; lastP = {x: e.clientX, y: e.clientY}; }
-};
-window.onmousemove = (e) => {
-    hoverPos = toWorld(e.clientX, e.clientY);
-    if (isPainting) paint(e.clientX, e.clientY);
-    if (isDragging) { camX -= (e.clientX - lastP.x)/zoom; camY -= (e.clientY - lastP.y)/zoom; lastP = {x: e.clientX, y: e.clientY}; }
-    cursorDB.get(myId).put({ x: hoverPos.wx, y: hoverPos.wy, name: myName, time: Date.now() });
-};
-window.onmouseup = () => isPainting = isDragging = false;
-window.onwheel = (e) => zoom = Math.min(Math.max(zoom * (e.deltaY > 0 ? 0.85 : 1.15), 1), 80);
-canvas.oncontextmenu = e => e.preventDefault();
+  // 入力イベント
+  canvas.onmousedown = e => {
+    const {wx, wy} = toWorld(e.clientX, e.clientY);
+    if(e.button===0 && !e.shiftKey) { isPainting=true; paint(wx, wy); }
+    else { isDragging=true; lastMouse={x:e.clientX, y:e.clientY}; canvas.style.cursor="grabbing"; }
+  };
+  window.onmousemove = e => {
+    const {wx, wy} = toWorld(e.clientX, e.clientY);
+    hoverPos = {wx, wy};
+    document.getElementById('coordDisplay').innerText = `x:${wx} y:${wy}`;
+    if(isPainting) paint(wx, wy);
+    if(isDragging) { camX-=(e.clientX-lastMouse.x)/zoom; camY-=(e.clientY-lastMouse.y)/zoom; lastMouse={x:e.clientX, y:e.clientY}; }
+    if(Math.random()<0.3) cursorDB.get(myId).put({x:wx, y:wy, n:myName, t:Date.now(), col:document.getElementById('colorPicker').value});
+  };
+  window.onmouseup = () => { isPainting=isDragging=false; canvas.style.cursor="crosshair"; };
+  
+  // スマホ & ホイール
+  let initDist=0, initZ=20;
+  canvas.ontouchstart = e => {
+    if(e.touches.length===1) canvas.onmousedown({...e.touches[0], button:0, target:canvas});
+    else if(e.touches.length===2) { isDragging=false; isPainting=false; initDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY); initZ=zoom; }
+  };
+  canvas.ontouchmove = e => {
+    e.preventDefault();
+    if(e.touches.length===1) window.onmousemove(e.touches[0]);
+    else if(e.touches.length===2) zoom = Math.min(Math.max(initZ * (Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY)/initDist), 2), 100);
+  };
+  canvas.ontouchend = window.onmouseup;
+  canvas.onwheel = e => { e.preventDefault(); zoom=Math.min(Math.max(zoom*(e.deltaY>0?0.9:1.1),2),100); };
 
-canvas.addEventListener('touchstart', e => {
-    e.preventDefault(); const t = e.touches[0]; hoverPos = toWorld(t.clientX, t.clientY);
-    if (e.touches.length === 1) { isPainting = true; paint(t.clientX, t.clientY); }
-    else { isDragging = true; lastP = {x: (e.touches[0].pageX + e.touches[1].pageX)/2, y: (e.touches[0].pageY + e.touches[1].pageY)/2}; }
-}, {passive:false});
+  // UI系
+  const pCon = document.getElementById('palette');
+  paletteColors.forEach(c => {
+    const s=document.createElement('div'); s.className='swatch'; s.style.background=c;
+    s.onclick=()=>{ isEraser=false; document.getElementById('eraserBtn').classList.remove('active'); document.getElementById('colorPicker').value=c; document.getElementById('colorPreviewWrapper').style.background=c; };
+    pCon.appendChild(s);
+  });
+  document.getElementById('colorPicker').oninput = e => { document.getElementById('colorPreviewWrapper').style.background=e.target.value; isEraser=false; document.getElementById('eraserBtn').classList.remove('active'); };
+  document.getElementById('eraserBtn').onclick = () => { isEraser=!isEraser; document.getElementById('eraserBtn').classList.toggle('active', isEraser); };
+  document.getElementById('nameInput').onchange = e => { myName=e.target.value||"名無し"; localStorage.setItem('ic_name', myName); };
+  window.toggleMenu = () => document.getElementById('main-panel').classList.toggle('hidden');
 
-function setupAdminEvents() {
-    document.getElementById('imageInput').onchange = (e) => {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            const img = new Image();
-            img.onload = () => {
-                const size = parseInt(document.getElementById('imgSize').value);
-                const tempC = document.createElement('canvas'); const tCtx = tempC.getContext('2d');
-                tempC.width = size; tempC.height = Math.floor(size * (img.height / img.width));
-                tCtx.drawImage(img, 0, 0, tempC.width, tempC.height);
-                const d = tCtx.getImageData(0, 0, tempC.width, tempC.height).data;
-                const pixels = [];
-                for(let y=0; y<tempC.height; y++) for(let x=0; x<tempC.width; x++) {
-                    const i = (y * tempC.width + x) * 4;
-                    if(d[i+3] > 128) pixels.push({x, y, hex: "#" + ((1 << 24) + (d[i] << 16) + (d[i+1] << 8) + d[i+2]).toString(16).slice(1)});
-                }
-                pendingImage = { data: pixels, w: tempC.width, h: tempC.height };
-            }; img.src = ev.target.result;
-        }; reader.readAsDataURL(e.target.files[0]);
-    };
-    document.getElementById('brushSizeInput').oninput = (e) => { brushSize = e.target.value; document.getElementById('brushSizeVal').innerText = brushSize; };
-}
-
-const colors = ["#000000", "#FFFFFF", "#FF3B30", "#FF9500", "#FFCC00", "#4CD964", "#5AC8FA", "#007AFF", "#5856D6", "#AF52DE", "#FF2D55", "#8E8E93"];
-colors.forEach(c => {
-    const s = document.createElement('div'); s.className = 'swatch'; s.style.backgroundColor = c;
-    s.onclick = () => { document.getElementById('colorPicker').value = c; document.getElementById('colorPreview').style.backgroundColor = c; };
-    document.getElementById('palette').appendChild(s);
-});
-document.getElementById('nameInput').oninput = (e) => myName = e.target.value || "Anon";
-chatDB.map().on((data) => {
-    if (!data) return;
-    const m = document.getElementById('messages'); const d = document.createElement('div');
-    d.className = 'msg'; d.innerHTML = `<b>${data.user}</b>${data.text}`;
-    m.appendChild(d); m.scrollTop = m.scrollHeight; if(m.childNodes.length > 20) m.removeChild(m.firstChild);
-});
-document.getElementById('chat-input').onkeypress = (e) => {
+  // チャット送信
+  document.getElementById('chat-input').onkeypress = (e) => {
     if (e.key === 'Enter' && e.target.value.trim() !== "") {
-        chatDB.get(Date.now()).put({ user: myName, text: e.target.value }); e.target.value = "";
+      const txt = e.target.value.substring(0, 100);
+      // Gun送信 (Net)
+      chatDB.get(Date.now()).put({u: myName, t: txt});
+      // Broadcast送信 (Tab)
+      localChannel.postMessage({ type: 'chat', u: myName, t: txt });
+      e.target.value = "";
     }
-};
+  };
 
-const otherCursors = {};
-cursorDB.map().on((data, id) => {
-    if (id === myId || !data) return;
-    if (!otherCursors[id]) {
-        const el = document.createElement('div'); el.className = 'cursor-label';
-        document.body.appendChild(el); otherCursors[id] = el;
+  // --- 管理者機能 (修正版) ---
+  window.addEventListener('keydown', async (e) => {
+    if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'a') {
+      const input = prompt("Admin Password (2020302):");
+      if (!input) return;
+
+      let isAuth = false;
+
+      // 1. Web Crypto API が使える環境 (HTTPS / Localhost)
+      if (window.crypto && window.crypto.subtle) {
+        try {
+          const enc = new TextEncoder();
+          const hashBuf = await crypto.subtle.digest('SHA-256', enc.encode(input.trim()));
+          const hashHex = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
+          // 2020302 のハッシュ
+          if (hashHex === "d09033320df44654922dc479fc92df4866f7df268685169a1987514fe3064cb4") isAuth = true;
+          else console.log("Hash mismatch:", hashHex);
+        } catch(err) {
+          console.error("Crypto error, falling back to plaintext", err);
+          // エラー時は平文チェック
+          if (input.trim() === "2020302") isAuth = true;
+        }
+      } 
+      // 2. HTTP や file:// 環境など (平文チェックフォールバック)
+      else {
+        if (input.trim() === "2020302") isAuth = true;
+      }
+
+      if (isAuth) {
+        const m = document.getElementById('admin-mount');
+        if(m.innerHTML === "") {
+          m.innerHTML = `
+            <div class="glass admin-box">
+              <label style="color:#ff3b30">Admin Tools</label>
+              <div style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid #ddd;">
+                <label>ブラシサイズ: <span id="brushSizeVal">${brushSize}</span></label>
+                <input type="range" min="1" max="50" value="${brushSize}" oninput="brushSize=this.value;document.getElementById('brushSizeVal').innerText=this.value">
+              </div>
+              <label>スタンプ画像</label>
+              <input type="file" id="imgInput" accept="image/*">
+              <div style="display:flex; gap:5px; margin-top:5px;">
+                  <input type="number" id="imgW" placeholder="幅" value="64">
+                  <button onclick="loadStamp()" style="background:#007AFF; color:white;">Load</button>
+              </div>
+              <button onclick="if(confirm('全消去?')) { dotsDB.put(null); localChunks={}; }" style="background:#ff3b30; color:white; margin-top:10px;">💥 Data Wipe</button>
+            </div>`;
+        }
+      } else {
+        alert("パスワードが違います");
+      }
     }
-    const s = toScreen(data.x, data.y);
-    otherCursors[id].style.left = s.x + 'px'; otherCursors[id].style.top = s.y + 'px';
-    otherCursors[id].innerText = data.name;
-    otherCursors[id].style.opacity = (Date.now() - data.time > 5000) ? 0 : 1;
-});
+  });
 
-async function saveToPantry() { try{ await fetch(PANTRY_URL, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(localDots) }); }catch(e){} }
-async function loadFromPantry() {
-    const res = await fetch(PANTRY_URL);
-    if (res.ok) {
-        const data = await res.json(); for (let key in data) dotsDB.get(key).put(data[key]);
-        document.getElementById('status-dot').classList.add("online");
-        setLanguage(document.getElementById('langSelect').value);
+  // スタンプ機能
+  let stampData = null;
+  window.loadStamp = () => {
+    const f = document.getElementById('imgInput').files[0];
+    if(!f) return;
+    const r = new FileReader();
+    r.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const w = parseInt(document.getElementById('imgW').value)||50, h = Math.floor(w*(img.height/img.width));
+        const c = document.createElement('canvas'); c.width=w; c.height=h;
+        const ctx = c.getContext('2d'); ctx.drawImage(img,0,0,w,h);
+        const d = ctx.getImageData(0,0,w,h).data;
+        stampData = [];
+        for(let y=0; y<h; y++) for(let x=0; x<w; x++) {
+          const i=(y*w+x)*4;
+          if(d[i+3]>128) stampData.push({x,y,hex:"#"+((1<<24)+(d[i]<<16)+(d[i+1]<<8)+d[i+2]).toString(16).slice(1)});
+        }
+        alert("画像ロード完了。クリックでスタンプ");
+      };
+      img.src = e.target.result;
+    };
+    r.readAsDataURL(f);
+  };
+  canvas.onclick = e => {
+    if(stampData && !isDragging) {
+      const {wx, wy} = toWorld(e.clientX, e.clientY);
+      let idx=0;
+      const loop = () => {
+        for(let i=0; i<50 && idx<stampData.length; i++, idx++) {
+          const p = stampData[idx];
+          const c = encodeCol(p.hex);
+          dotsDB.get(`${wx+p.x}_${wy+p.y}`).put(c);
+          updateLocalPixel(wx+p.x, wy+p.y, p.hex);
+          localChannel.postMessage({ type: 'pixel', x: wx+p.x, y: wy+p.y, c: p.hex });
+        }
+        if(idx<stampData.length) requestAnimationFrame(loop); else stampData=null;
+      };
+      loop();
     }
-}
-function clearCanvas() { if(confirm("WIPE?")) dotsDB.put(null); }
-setInterval(() => { if(Object.keys(localDots).length > 0) saveToPantry(); }, 30000);
-loadFromPantry();
+  };
 
-const userL = navigator.language.split('-')[0];
-document.getElementById('langSelect').value = i18n[userL] ? userL : 'en';
-setLanguage(document.getElementById('langSelect').value);
-render();
+  render();
 </script>
 </body>
 </html>
