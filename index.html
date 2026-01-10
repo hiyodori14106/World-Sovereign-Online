@@ -1,335 +1,353 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Infinite Canvas - Ultimate Fixed</title>
-  <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
-  <style>
-    :root { --primary: #007AFF; --bg: #e5e5e5; --ui-bg: rgba(255, 255, 255, 0.96); --text: #333; --shadow: 0 4px 20px rgba(0,0,0,0.15); --radius: 12px; }
-    body { margin: 0; overflow: hidden; background: var(--bg); font-family: sans-serif; touch-action: none; }
-    canvas { display: block; cursor: crosshair; background: white; }
-    
-    #ui-container { position: fixed; top: 10px; left: 10px; z-index: 100; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
-    .glass { background: var(--ui-bg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(0,0,0,0.1); border-radius: var(--radius); box-shadow: var(--shadow); pointer-events: auto; padding: 12px; width: 260px; }
-    
-    #menu-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: #333; color: white; font-size: 20px; cursor: pointer; pointer-events: auto; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
-    #main-panel.hidden { display: none; }
-    
-    h2 { margin: 0 0 5px; font-size: 14px; color: #555; text-transform: uppercase; letter-spacing: 1px; }
-    .status { font-size: 10px; color: #999; margin-bottom: 10px; display: flex; justify-content: space-between; }
-    
-    input[type=text], button { width: 100%; border: 1px solid #ddd; background: #f9f9f9; padding: 8px; border-radius: 6px; margin-bottom: 6px; box-sizing: border-box; outline: none; }
-    input[type=text]:focus { border-color: var(--primary); background: #fff; }
-    
-    .row { display: flex; gap: 6px; margin-bottom: 6px; }
-    #colorPreview { flex: 0 0 40px; height: 40px; border-radius: 6px; border: 1px solid #ccc; overflow: hidden; position: relative; }
-    #colorPicker { position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; cursor: pointer; }
-    
-    #eraserBtn { flex: 1; cursor: pointer; background: white; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
-    #eraserBtn.active { background: #333; color: white; border-color: #333; }
-    
-    /* 実用的なパレットレイアウト */
-    .palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-top: 8px; }
-    .swatch { aspect-ratio: 1; border-radius: 3px; cursor: pointer; border: 1px solid rgba(0,0,0,0.2); }
-    .swatch:hover { transform: scale(1.1); z-index: 10; }
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+ <title>Infinite Canvas - Ultimate Fixed</title>
+ <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+ <style>
+  :root { --primary: #007AFF; --bg: #e5e5e5; --ui-bg: rgba(255, 255, 255, 0.96); --text: #333; --shadow: 0 4px 20px rgba(0,0,0,0.15); --radius: 12px; }
+  body { margin: 0; overflow: hidden; background: var(--bg); font-family: sans-serif; touch-action: none; }
+  canvas { display: block; cursor: crosshair; background: white; }
+   
+  #ui-container { position: fixed; top: 10px; left: 10px; z-index: 100; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  .glass { background: var(--ui-bg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(0,0,0,0.1); border-radius: var(--radius); box-shadow: var(--shadow); pointer-events: auto; padding: 12px; width: 260px; }
+   
+  #menu-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: #333; color: white; font-size: 20px; cursor: pointer; pointer-events: auto; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+  #main-panel.hidden { display: none; }
+   
+  h2 { margin: 0 0 5px; font-size: 14px; color: #555; text-transform: uppercase; letter-spacing: 1px; }
+  .status { font-size: 10px; color: #999; margin-bottom: 10px; display: flex; justify-content: space-between; }
+   
+  input[type=text], button { width: 100%; border: 1px solid #ddd; background: #f9f9f9; padding: 8px; border-radius: 6px; margin-bottom: 6px; box-sizing: border-box; outline: none; }
+  input[type=text]:focus { border-color: var(--primary); background: #fff; }
+   
+  .row { display: flex; gap: 6px; margin-bottom: 6px; }
+  #colorPreview { flex: 0 0 40px; height: 40px; border-radius: 6px; border: 1px solid #ccc; overflow: hidden; position: relative; }
+  #colorPicker { position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; cursor: pointer; }
+   
+  #eraserBtn { flex: 1; cursor: pointer; background: white; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+  #eraserBtn.active { background: #333; color: white; border-color: #333; }
+   
+  /* 実用的なパレットレイアウト */
+  .palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-top: 8px; }
+  .swatch { aspect-ratio: 1; border-radius: 3px; cursor: pointer; border: 1px solid rgba(0,0,0,0.2); }
+  .swatch:hover { transform: scale(1.1); z-index: 10; }
 
-    #chat-container { position: fixed; bottom: 10px; right: 10px; width: 260px; z-index: 100; display: flex; flex-direction: column; }
-    .chat-header { padding: 8px; font-weight: bold; background: #fff; cursor: pointer; border-bottom: 1px solid #eee; border-radius: var(--radius) var(--radius) 0 0; font-size: 12px; }
-    #messages { height: 120px; overflow-y: auto; padding: 8px; font-size: 11px; background: rgba(255,255,255,0.8); }
-    #chat-input { margin: 0; border-radius: 0 0 var(--radius) var(--radius); border-top: none; }
+  #chat-container { position: fixed; bottom: 10px; right: 10px; width: 260px; z-index: 100; display: flex; flex-direction: column; }
+  .chat-header { padding: 8px; font-weight: bold; background: #fff; cursor: pointer; border-bottom: 1px solid #eee; border-radius: var(--radius) var(--radius) 0 0; font-size: 12px; }
+  #messages { height: 120px; overflow-y: auto; padding: 8px; font-size: 11px; background: rgba(255,255,255,0.8); }
+  #chat-input { margin: 0; border-radius: 0 0 var(--radius) var(--radius); border-top: none; }
 
-    .admin-box { border: 2px solid #ff3b30; background: #fff5f5; margin-top: 10px; padding: 10px; border-radius: 8px; }
-  </style>
+  .admin-box { border: 2px solid #ff3b30; background: #fff5f5; margin-top: 10px; padding: 10px; border-radius: 8px; }
+ </style>
 </head>
 <body>
 
 <div id="ui-container">
-  <button id="menu-btn" onclick="document.getElementById('main-panel').classList.toggle('hidden')">☰</button>
-  <div id="main-panel" class="glass">
-    <h2>Infinite Canvas</h2>
-    <div class="status">
-      <span id="coordDisplay">0, 0</span>
-      <span id="saveStatus">Connecting...</span>
-    </div>
-    
-    <input type="text" id="nameInput" placeholder="名前を入力" maxlength="10">
-    
-    <div class="row">
-      <div id="colorPreview"><input type="color" id="colorPicker" value="#000000"></div>
-      <button id="eraserBtn" title="消しゴム">🧹</button>
-    </div>
-    
-    <div id="palette" class="palette"></div>
-    <div id="admin-mount"></div>
+ <button id="menu-btn" onclick="document.getElementById('main-panel').classList.toggle('hidden')">☰</button>
+ <div id="main-panel" class="glass">
+  <h2>Infinite Canvas</h2>
+  <div class="status">
+   <span id="coordDisplay">0, 0</span>
+   <span id="saveStatus">Connecting...</span>
   </div>
+   
+  <input type="text" id="nameInput" placeholder="名前を入力" maxlength="10">
+   
+  <div class="row">
+   <div id="colorPreview"><input type="color" id="colorPicker" value="#000000"></div>
+   <button id="eraserBtn" title="消しゴム">🧹</button>
+  </div>
+   
+  <div id="palette" class="palette"></div>
+  <div id="admin-mount"></div>
+ </div>
 </div>
 
 <div id="chat-container" class="glass" style="padding:0;">
-  <div class="chat-header" onclick="let m=document.getElementById('messages'); m.style.display=m.style.display==='none'?'block':'none'">💬 チャット (開閉)</div>
-  <div id="messages"></div>
-  <input type="text" id="chat-input" placeholder="メッセージ...">
+ <div class="chat-header" onclick="let m=document.getElementById('messages'); m.style.display=m.style.display==='none'?'block':'none'">💬 チャット (開閉)</div>
+ <div id="messages"></div>
+ <input type="text" id="chat-input" placeholder="メッセージ...">
 </div>
 
 <canvas id="gameCanvas"></canvas>
 
 <script>
-  // --- 1. 初期設定 ---
-  const PANTRY_ID = "22d3843a-59e1-49f7-a005-0ae17aac5ce5";
-  const PANTRY_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/canvas_pixel_data`;
-  const localChannel = new BroadcastChannel('inf_canvas_v15_fix');
+ // --- 1. 初期設定 ---
+ // 指定されたIDに変更
+ const PANTRY_ID = "b1ff8b72-63c0-469d-9bbe-b006c5751552";
+ const PANTRY_URL = `https://getpantry.cloud/apiv1/pantry/${}/basket/canvas_pixel_data`;
+ const localChannel = new BroadcastChannel('inf_canvas_v15_fix');
   
-  // Gun.js (複数リレーで接続確率を最大化)
-  const gun = Gun({
-    peers: [
-      'https://gun-manhattan.herokuapp.com/gun',
-      'https://gun-us.herokuapp.com/gun',
-      'https://gun-eu.herokuapp.com/gun'
-    ],
-    localStorage: true
-  });
+ // Gun.js (複数リレーで接続確率を最大化)
+ const gun = Gun({
+  peers: [
+   'https://gun-manhattan.herokuapp.com/gun',
+   'https://gun-us.herokuapp.com/gun',
+   'https://gun-eu.herokuapp.com/gun'
+  ],
+  localStorage: true
+ });
   
-  const APP_KEY = 'inf_canvas_v15_fixed';
-  const db = gun.get(APP_KEY);
-  const dotsDB = db.get('dots');
-  const chatDB = db.get('chat');
-  const cursorDB = db.get('cursors');
+ const APP_KEY = 'inf_canvas_v15_fixed';
+ const db = gun.get(APP_KEY);
+ const dotsDB = db.get('dots');
+ const chatDB = db.get('chat');
+ const cursorDB = db.get('cursors');
 
-  const canvas = document.getElementById('gameCanvas');
-  const ctx = canvas.getContext('2d', { alpha: false });
+ const canvas = document.getElementById('gameCanvas');
+ const ctx = canvas.getContext('2d', { alpha: false });
 
-  // --- 2. 新しいカラーパレット (実用的な16色) ---
-  const paletteColors = [
-    "#000000", "#555555", "#AAAAAA", "#FFFFFF", // モノクロ
-    "#FF0000", "#FF7F00", "#FFFF00", "#00FF00", // 暖色・緑
-    "#00FFFF", "#0000FF", "#8A2BE2", "#FF00FF", // 冷色・紫
-    "#8B4513", "#FFDEAD", "#008080", "#FF1493"  // 茶色・肌色・その他
-  ];
-  // 圧縮ロジック
-  const encodeCol = c => { if(!c)return null; const i=paletteColors.indexOf(c.toUpperCase()); return i!==-1?i.toString(16):c; };
-  const decodeCol = c => { if(!c)return null; if(c.length<=2 && /^[0-9A-Fa-f]+$/.test(c)) return paletteColors[parseInt(c,16)]||c; return c; };
+ // --- 2. 新しいカラーパレット (実用的な16色) ---
+ const paletteColors = [
+  "#000000", "#555555", "#AAAAAA", "#FFFFFF", // モノクロ
+  "#FF0000", "#FF7F00", "#FFFF00", "#00FF00", // 暖色・緑
+  "#00FFFF", "#0000FF", "#8A2BE2", "#FF00FF", // 冷色・紫
+  "#8B4513", "#FFDEAD", "#008080", "#FF1493"  // 茶色・肌色・その他
+ ];
+ // 圧縮ロジック
+ const encodeCol = c => { if(!c)return null; const i=paletteColors.indexOf(c.toUpperCase()); return i!==-1?i.toString(16):c; };
+ const decodeCol = c => { if(!c)return null; if(c.length<=2 && /^[0-9A-Fa-f]+$/.test(c)) return paletteColors[parseInt(c,16)]||c; return c; };
 
-  // --- 3. データ管理 ---
-  const CHUNK_SIZE = 16;
-  let localChunks = {}; 
-  const getChunkId = (wx, wy) => `${Math.floor(wx/CHUNK_SIZE)}_${Math.floor(wy/CHUNK_SIZE)}`;
+ // --- 3. データ管理 ---
+ const CHUNK_SIZE = 16;
+ let localChunks = {}; 
+ const getChunkId = (wx, wy) => `${Math.floor(wx/CHUNK_SIZE)}_${Math.floor(wy/CHUNK_SIZE)}`;
 
-  const updateLocalPixel = (wx, wy, color) => {
-    const cid = getChunkId(wx, wy);
-    if (!localChunks[cid]) localChunks[cid] = {};
-    const k = `${((wx%CHUNK_SIZE)+CHUNK_SIZE)%CHUNK_SIZE}_${((wy%CHUNK_SIZE)+CHUNK_SIZE)%CHUNK_SIZE}`;
-    if (color === null) {
-      delete localChunks[cid][k];
-      if (Object.keys(localChunks[cid]).length === 0) delete localChunks[cid];
-    } else {
-      localChunks[cid][k] = color;
-    }
-  };
-
-  // Pantry 読み込み
-  async function loadFromPantry() {
-    try {
-      document.getElementById('saveStatus').innerText = "Loading...";
-      const res = await fetch(PANTRY_URL);
-      if(!res.ok) throw new Error("Empty");
-      const json = await res.json();
-      const pixels = json.pixels || {};
-      let count = 0;
-      for(let key in pixels) {
-        const [x, y] = key.split('_').map(Number);
-        updateLocalPixel(x, y, decodeCol(pixels[key]));
-        count++;
-      }
-      document.getElementById('saveStatus').innerText = `Sync OK (${count})`;
-    } catch(e) { document.getElementById('saveStatus').innerText = "Ready"; }
+ const updateLocalPixel = (wx, wy, color) => {
+  const cid = getChunkId(wx, wy);
+  if (!localChunks[cid]) localChunks[cid] = {};
+  const k = `${((wx%CHUNK_SIZE)+CHUNK_SIZE)%CHUNK_SIZE}_${((wy%CHUNK_SIZE)+CHUNK_SIZE)%CHUNK_SIZE}`;
+  if (color === null) {
+   delete localChunks[cid][k];
+   if (Object.keys(localChunks[cid]).length === 0) delete localChunks[cid];
+  } else {
+   localChunks[cid][k] = color;
   }
-  setTimeout(loadFromPantry, 500);
+ };
 
-  // Pantry 保存 (常時保存)
-  const saveToPantry = async () => {
-    document.getElementById('saveStatus').innerText = "Saving...";
-    const flatData = {};
-    for(let cid in localChunks) {
-      const [cx, cy] = cid.split('_').map(Number);
-      const chunk = localChunks[cid];
-      for(let k in chunk) {
-        const [lx, ly] = k.split('_').map(Number);
-        flatData[`${cx*CHUNK_SIZE+lx}_${cy*CHUNK_SIZE+ly}`] = encodeCol(chunk[k]);
-      }
-    }
-    if(Object.keys(flatData).length > 0) {
-      try {
-        await fetch(PANTRY_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pixels: flatData, updated: Date.now() })
-        });
-        document.getElementById('saveStatus').innerText = "Saved";
-      } catch(e) { document.getElementById('saveStatus').innerText = "Retry"; }
-    }
-  };
-  setInterval(saveToPantry, 30000);
-  window.addEventListener("beforeunload", saveToPantry);
-
-  // --- 4. 通信イベント ---
-  const processedChatIds = new Set();
-  function addChatMessage(user, text, isLocal) {
-    const id = user + text + (isLocal ? "L" : "R");
-    if(processedChatIds.has(id)) return; processedChatIds.add(id);
-    const m = document.getElementById('messages');
-    if(!m) return;
-    const div = document.createElement('div');
-    div.innerHTML = `<span style="color:#888;">${new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span> <b>${user.replace(/</g,"&lt;")}</b>: ${text.replace(/</g,"&lt;")}`;
-    m.appendChild(div); m.scrollTop = m.scrollHeight;
+ // Pantry 読み込み
+ async function loadFromPantry() {
+  try {
+   document.getElementById('saveStatus').innerText = "Loading (Pantry)...";
+   const res = await fetch(PANTRY_URL);
+   if(!res.ok) throw new Error("Empty");
+   const json = await res.json();
+   const pixels = json.pixels || {};
+   let count = 0;
+   for(let key in pixels) {
+    const [x, y] = key.split('_').map(Number);
+    updateLocalPixel(x, y, decodeCol(pixels[key]));
+    count++;
+   }
+   document.getElementById('saveStatus').innerText = `Sync OK ($)`;
+  } catch(e) { document.getElementById('saveStatus').innerText = "Ready"; }
+ }
+ 
+ // Pantry 保存 (常時保存)
+ const saveToPantry = async () => {
+  document.getElementById('saveStatus').innerText = "Saving...";
+  const flatData = {};
+  for(let cid in localChunks) {
+   const [cx, cy] = cid.split('_').map(Number);
+   const chunk = localChunks[cid];
+   for(let k in chunk) {
+    const [lx, ly] = k.split('_').map(Number);
+    flatData[`${cx*CHUNK_SIZE+lx}_${cy*CHUNK_SIZE+ly}`] = encodeCol(chunk[k]);
+   }
   }
+  if(Object.keys(flatData).length > 0) {
+   try {
+    await fetch(PANTRY_URL, {
+     method: 'POST',
+     headers: { 'Content-Type': 'application/json' },
+     body: JSON.stringify({ pixels: flatData, updated: Date.now() })
+    });
+    document.getElementById('saveStatus').innerText = "Saved";
+   } catch(e) { document.getElementById('saveStatus').innerText = "Retry"; }
+  }
+ };
+ // 保存間隔を10秒に変更
+ setInterval(saveToPantry, 10000);
+ window.addEventListener("beforeunload", saveToPantry);
 
-  dotsDB.map().on((d, k) => { const [x,y]=k.split('_').map(Number); if(!isNaN(x)) updateLocalPixel(x,y,decodeCol(d)); });
-  chatDB.map().on((d, i) => { if(d && Date.now()-i<600000) addChatMessage(d.u,d.t,false); });
+ // --- 4. 通信イベント ---
+ const processedChatIds = new Set();
+ function addChatMessage(user, text, isLocal) {
+  const id = user + text + (isLocal ? "L" : "R");
+  if(processedChatIds.has(id)) return; processedChatIds.add(id);
+  const m = document.getElementById('messages');
+  if(!m) return;
+  const div = document.createElement('div');
+  div.innerHTML = `<span style="color:#888;">${new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span> <b>${user.replace(/</g,"&lt;")}</b>: ${text.replace(/</g,"&lt;")}`;
+  m.appendChild(div); m.scrollTop = m.scrollHeight;
+ }
+
+ let gunReceivedData = false; // Gunからデータを受け取ったかフラグ
+
+ dotsDB.map().on((d, k) => { 
+  // Gunからデータが来たらフラグを立てる
+  if(d) gunReceivedData = true;
+  const [x,y]=k.split('_').map(Number); 
+  if(!isNaN(x)) updateLocalPixel(x,y,decodeCol(d)); 
+ });
+
+ // 人がいる(Gunが有効)ならPantry読み込みをスキップ、そうでなければPantryからロード
+ setTimeout(() => {
+  if(!gunReceivedData) {
+    loadFromPantry();
+  } else {
+    document.getElementById('saveStatus').innerText = "Sync (Gun)";
+  }
+ }, 2000);
+
+ chatDB.map().on((d, i) => { if(d && Date.now()-i<600000) addChatMessage(d.u,d.t,false); });
   
-  localChannel.onmessage = (e) => {
-    const d = e.data;
-    if(d.type==='pixel') updateLocalPixel(d.x, d.y, d.c);
-    else if(d.type==='chat') addChatMessage(d.u, d.t, true);
-  };
+ localChannel.onmessage = (e) => {
+  const d = e.data;
+  if(d.type==='pixel') updateLocalPixel(d.x, d.y, d.c);
+  else if(d.type==='chat') addChatMessage(d.u, d.t, true);
+ };
 
-  // --- 5. メインループ ---
-  let myId = Math.random().toString(36).slice(2);
-  let myName = localStorage.getItem('ic_name') || "名無し";
-  document.getElementById('nameInput').value = myName;
+ // --- 5. メインループ ---
+ let myId = Math.random().toString(36).slice(2);
+ let myName = localStorage.getItem('ic_name') || "名無し";
+ document.getElementById('nameInput').value = myName;
 
-  let camX=0, camY=0, zoom=20;
-  let isPainting=false, isDragging=false, isEraser=false;
-  let lastMouse={x:0,y:0}, brushSize=1;
-  let hoverPos=null, otherCursors={};
+ let camX=0, camY=0, zoom=20;
+ let isPainting=false, isDragging=false, isEraser=false;
+ let lastMouse={x:0,y:0}, brushSize=1;
+ let hoverPos=null, otherCursors={};
 
-  cursorDB.map().on((d, id) => { if(id!==myId && d && Date.now()-d.t<10000) otherCursors[id]=d; });
-  const toScreen=(wx,wy)=>({x:Math.floor((wx-camX)*zoom+canvas.width/2), y:Math.floor((wy-camY)*zoom+canvas.height/2)});
-  const toWorld=(sx,sy)=>({wx:Math.floor((sx-canvas.width/2)/zoom+camX), wy:Math.floor((sy-canvas.height/2)/zoom+camY)});
+ cursorDB.map().on((d, id) => { if(id!==myId && d && Date.now()-d.t<10000) otherCursors[id]=d; });
+ const toScreen=(wx,wy)=>({x:Math.floor((wx-camX)*zoom+canvas.width/2), y:Math.floor((wy-camY)*zoom+canvas.height/2)});
+ const toWorld=(sx,sy)=>({wx:Math.floor((sx-canvas.width/2)/zoom+camX), wy:Math.floor((sy-canvas.height/2)/zoom+camY)});
 
-  function render() {
-    if(canvas.width!==window.innerWidth||canvas.height!==window.innerHeight){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
-    ctx.fillStyle='#e5e5e5'; ctx.fillRect(0,0,canvas.width,canvas.height);
+ function render() {
+  if(canvas.width!==window.innerWidth||canvas.height!==window.innerHeight){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
+  ctx.fillStyle='#e5e5e5'; ctx.fillRect(0,0,canvas.width,canvas.height);
 
-    // グリッド線
-    if(zoom>8) {
-      ctx.beginPath(); ctx.strokeStyle="rgba(0,0,0,0.08)"; ctx.lineWidth=1;
-      const s=toWorld(0,0), e=toWorld(canvas.width,canvas.height);
-      for(let x=s.wx; x<=e.wx; x++) { const p=toScreen(x,0); ctx.moveTo(p.x,0); ctx.lineTo(p.x,canvas.height); }
-      for(let y=s.wy; y<=e.wy; y++) { const p=toScreen(0,y); ctx.moveTo(0,p.y); ctx.lineTo(canvas.width,p.y); }
-      ctx.stroke();
-    }
-
-    // ドット描画
-    const sW=toWorld(0,0), eW=toWorld(canvas.width,canvas.height);
-    const sCX=Math.floor(sW.wx/CHUNK_SIZE), eCX=Math.floor(eW.wx/CHUNK_SIZE);
-    const sCY=Math.floor(sW.wy/CHUNK_SIZE), eCY=Math.floor(eW.wy/CHUNK_SIZE);
-
-    for(let cy=sCY; cy<=eCY; cy++) for(let cx=sCX; cx<=eCX; cx++) {
-      const chunk = localChunks[`${cx}_${cy}`];
-      if(!chunk) continue;
-      const ox=cx*CHUNK_SIZE, oy=cy*CHUNK_SIZE;
-      for(let k in chunk) {
-        const [lx,ly]=k.split('_').map(Number);
-        const scr=toScreen(ox+lx,oy+ly);
-        ctx.fillStyle=chunk[k]; ctx.fillRect(scr.x,scr.y,Math.ceil(zoom),Math.ceil(zoom));
-      }
-    }
-
-    // カーソル
-    if (hoverPos) {
-      const b=parseInt(brushSize), off=Math.floor((b-1)/2);
-      ctx.strokeStyle=isEraser?"#ff3b30":"rgba(0,0,0,0.5)"; ctx.lineWidth=2;
-      const s=toScreen(hoverPos.wx-off,hoverPos.wy-off);
-      ctx.strokeRect(s.x,s.y,b*zoom,b*zoom);
-    }
-    // 他ユーザー
-    const now=Date.now();
-    for(let id in otherCursors){
-      const c=otherCursors[id];
-      if(now-c.t>5000) continue;
-      const s=toScreen(c.x,c.y);
-      ctx.fillStyle=c.col||"#333"; ctx.beginPath(); ctx.arc(s.x,s.y,5,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle="black"; ctx.font="11px sans-serif"; ctx.fillText(c.n,s.x+8,s.y+4);
-    }
-    requestAnimationFrame(render);
+  // グリッド線
+  if(zoom>8) {
+   ctx.beginPath(); ctx.strokeStyle="rgba(0,0,0,0.08)"; ctx.lineWidth=1;
+   const s=toWorld(0,0), e=toWorld(canvas.width,canvas.height);
+   for(let x=s.wx; x<=e.wx; x++) { const p=toScreen(x,0); ctx.moveTo(p.x,0); ctx.lineTo(p.x,canvas.height); }
+   for(let y=s.wy; y<=e.wy; y++) { const p=toScreen(0,y); ctx.moveTo(0,p.y); ctx.lineTo(canvas.width,p.y); }
+   ctx.stroke();
   }
 
-  function paint(wx, wy) {
-    const color = isEraser ? null : document.getElementById('colorPicker').value;
-    const b=parseInt(brushSize), r=Math.floor((b-1)/2);
-    for(let dx=-r; dx<=r+(b%2===0?1:0); dx++) for(let dy=-r; dy<=r+(b%2===0?1:0); dy++){
-      if(b>1 && dx*dx+dy*dy>r*r+1) continue;
-      const tx=wx+dx, ty=wy+dy;
-      const cid=getChunkId(tx,ty);
-      const k=`${((tx%CHUNK_SIZE)+CHUNK_SIZE)%CHUNK_SIZE}_${((ty%CHUNK_SIZE)+CHUNK_SIZE)%CHUNK_SIZE}`;
-      if((localChunks[cid]?.[k])!==color) {
-        dotsDB.get(`${tx}_${ty}`).put(encodeCol(color));
-        updateLocalPixel(tx,ty,color);
-        localChannel.postMessage({type:'pixel',x:tx,y:ty,c:color});
-      }
-    }
+  // ドット描画
+  const sW=toWorld(0,0), eW=toWorld(canvas.width,canvas.height);
+  const sCX=Math.floor(sW.wx/CHUNK_SIZE), eCX=Math.floor(eW.wx/CHUNK_SIZE);
+  const sCY=Math.floor(sW.wy/CHUNK_SIZE), eCY=Math.floor(eW.wy/CHUNK_SIZE);
+
+  for(let cy=sCY; cy<=eCY; cy++) for(let cx=sCX; cx<=eCX; cx++) {
+   const chunk = localChunks[`${}_${}`];
+   if(!chunk) continue;
+   const ox=cx*CHUNK_SIZE, oy=cy*CHUNK_SIZE;
+   for(let k in chunk) {
+    const [lx,ly]=k.split('_').map(Number);
+    const scr=toScreen(ox+lx,oy+ly);
+    ctx.fillStyle=chunk[k]; ctx.fillRect(scr.x,scr.y,Math.ceil(zoom),Math.ceil(zoom));
+   }
   }
 
-  // 入力系
-  canvas.onmousedown=e=>{const{wx,wy}=toWorld(e.clientX,e.clientY);if(e.button===0&&!e.shiftKey){isPainting=true;paint(wx,wy);}else{isDragging=true;lastMouse={x:e.clientX,y:e.clientY};canvas.style.cursor="grabbing";}};
-  window.onmousemove=e=>{const{wx,wy}=toWorld(e.clientX,e.clientY);hoverPos={wx,wy};document.getElementById('coordDisplay').innerText=`${wx}, ${wy}`;if(isPainting)paint(wx,wy);if(isDragging){camX-=(e.clientX-lastMouse.x)/zoom;camY-=(e.clientY-lastMouse.y)/zoom;lastMouse={x:e.clientX,y:e.clientY};}if(Math.random()<0.3)cursorDB.get(myId).put({x:wx,y:wy,n:myName,t:Date.now(),col:document.getElementById('colorPicker').value});};
-  window.onmouseup=()=>{isPainting=isDragging=false;canvas.style.cursor="crosshair";};
+  // カーソル
+  if (hoverPos) {
+   const b=parseInt(brushSize), off=Math.floor((b-1)/2);
+   ctx.strokeStyle=isEraser?"#ff3b30":"rgba(0,0,0,0.5)"; ctx.lineWidth=2;
+   const s=toScreen(hoverPos.wx-off,hoverPos.wy-off);
+   ctx.strokeRect(s.x,s.y,b*zoom,b*zoom);
+  }
+  // 他ユーザー
+  const now=Date.now();
+  for(let id in otherCursors){
+   const c=otherCursors[id];
+   if(now-c.t>5000) continue;
+   const s=toScreen(c.x,c.y);
+   ctx.fillStyle=c.col||"#333"; ctx.beginPath(); ctx.arc(s.x,s.y,5,0,Math.PI*2); ctx.fill();
+   ctx.fillStyle="black"; ctx.font="11px sans-serif"; ctx.fillText(c.n,s.x+8,s.y+4);
+  }
+  requestAnimationFrame(render);
+ }
+
+ function paint(wx, wy) {
+  const color = isEraser ? null : document.getElementById('colorPicker').value;
+  const b=parseInt(brushSize), r=Math.floor((b-1)/2);
+  for(let dx=-r; dx<=r+(b%2===0?1:0); dx++) for(let dy=-r; dy<=r+(b%2===0?1:0); dy++){
+   if(b>1 && dx*dx+dy*dy>r*r+1) continue;
+   const tx=wx+dx, ty=wy+dy;
+   const cid=getChunkId(tx,ty);
+   const k=`${((tx%CHUNK_SIZE)+CHUNK_SIZE)%CHUNK_SIZE}_${((ty%CHUNK_SIZE)+CHUNK_SIZE)%CHUNK_SIZE}`;
+   if((localChunks[cid]?.[k])!==color) {
+    dotsDB.get(`${}_${}`).put(encodeCol(color));
+    updateLocalPixel(tx,ty,color);
+    localChannel.postMessage({type:'pixel',x:tx,y:ty,c:color});
+   }
+  }
+ }
+
+ // 入力系
+ canvas.onmousedown=e=>{const{wx,wy}=toWorld(e.clientX,e.clientY);if(e.button===0&&!e.shiftKey){isPainting=true;paint(wx,wy);}else{isDragging=true;lastMouse={x:e.clientX,y:e.clientY};canvas.style.cursor="grabbing";}};
+ window.onmousemove=e=>{const{wx,wy}=toWorld(e.clientX,e.clientY);hoverPos={wx,wy};document.getElementById('coordDisplay').innerText=`${}, ${}`;if(isPainting)paint(wx,wy);if(isDragging){camX-=(e.clientX-lastMouse.x)/zoom;camY-=(e.clientY-lastMouse.y)/zoom;lastMouse={x:e.clientX,y:e.clientY};}if(Math.random()<0.3)cursorDB.get(myId).put({x:wx,y:wy,n:myName,t:Date.now(),col:document.getElementById('colorPicker').value});};
+ window.onmouseup=()=>{isPainting=isDragging=false;canvas.style.cursor="crosshair";};
   
-  let initDist=0,initZ=20;
-  canvas.ontouchstart=e=>{if(e.touches.length===1)canvas.onmousedown({...e.touches[0],button:0,target:canvas});else if(e.touches.length===2){isDragging=false;isPainting=false;initDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);initZ=zoom;}};
-  canvas.ontouchmove=e=>{e.preventDefault();if(e.touches.length===1)window.onmousemove(e.touches[0]);else if(e.touches.length===2)zoom=Math.min(Math.max(initZ*(Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY)/initDist),2),100);};
-  canvas.ontouchend=window.onmouseup;
-  canvas.onwheel=e=>{e.preventDefault();zoom=Math.min(Math.max(zoom*(e.deltaY>0?0.9:1.1),2),100);};
+ let initDist=0,initZ=20;
+ canvas.ontouchstart=e=>{if(e.touches.length===1)canvas.onmousedown({...e.touches[0],button:0,target:canvas});else if(e.touches.length===2){isDragging=false;isPainting=false;initDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);initZ=zoom;}};
+ canvas.ontouchmove=e=>{e.preventDefault();if(e.touches.length===1)window.onmousemove(e.touches[0]);else if(e.touches.length===2)zoom=Math.min(Math.max(initZ*(Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY)/initDist),2),100);};
+ canvas.ontouchend=window.onmouseup;
+ canvas.onwheel=e=>{e.preventDefault();zoom=Math.min(Math.max(zoom*(e.deltaY>0?0.9:1.1),2),100);};
 
-  // UIイベント
-  const pCon=document.getElementById('palette');
-  paletteColors.forEach(c=>{const s=document.createElement('div');s.className='swatch';s.style.background=c;s.onclick=()=>{isEraser=false;document.getElementById('eraserBtn').classList.remove('active');document.getElementById('colorPicker').value=c;};pCon.appendChild(s);});
-  document.getElementById('eraserBtn').onclick=()=>{isEraser=!isEraser;document.getElementById('eraserBtn').classList.toggle('active',isEraser);};
-  document.getElementById('nameInput').onchange=e=>{myName=e.target.value||"名無し";localStorage.setItem('ic_name',myName);};
-  document.getElementById('chat-input').onkeypress=e=>{if(e.key==='Enter'&&e.target.value.trim()!==""){const t=e.target.value.substring(0,100);chatDB.get(Date.now()).put({u:myName,t:t});localChannel.postMessage({type:'chat',u:myName,t:t});e.target.value="";}};
+ // UIイベント
+ const pCon=document.getElementById('palette');
+ paletteColors.forEach(c=>{const s=document.createElement('div');s.className='swatch';s.style.background=c;s.onclick=()=>{isEraser=false;document.getElementById('eraserBtn').classList.remove('active');document.getElementById('colorPicker').value=c;};pCon.appendChild(s);});
+ document.getElementById('eraserBtn').onclick=()=>{isEraser=!isEraser;document.getElementById('eraserBtn').classList.toggle('active',isEraser);};
+ document.getElementById('nameInput').onchange=e=>{myName=e.target.value||"名無し";localStorage.setItem('ic_name',myName);};
+ document.getElementById('chat-input').onkeypress=e=>{if(e.key==='Enter'&&e.target.value.trim()!==""){const t=e.target.value.substring(0,100);chatDB.get(Date.now()).put({u:myName,t:t});localChannel.postMessage({type:'chat',u:myName,t:t});e.target.value="";}};
 
-  // --- 5. 管理者認証 (100%動作保証: Base64反転チェック) ---
-  window.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'a') {
-      const input = prompt("Admin Password:");
-      if (!input) return;
+ // --- 5. 管理者認証 (100%動作保証: Base64反転チェック) ---
+ window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'a') {
+   const input = prompt("Admin Password:");
+   if (!input) return;
 
-      // パスワード "2020302" を反転すると "2030202"
-      // これをBase64化すると "MjAzMDIwMg=="
-      // この単純な比較により、環境依存エラー（cryptoなど）は絶対に起きません。
-      const reversedInput = input.trim().split('').reverse().join('');
-      const check = btoa(reversedInput);
+   // パスワード "2020302" を反転すると "2030202"
+   // これをBase64化すると "MjAzMDIwMg=="
+   // この単純な比較により、環境依存エラー（cryptoなど）は絶対に起きません。
+   const reversedInput = input.trim().split('').reverse().join('');
+   const check = btoa(reversedInput);
 
-      if (check === "MjAzMDIwMg==") {
-        const m = document.getElementById('admin-mount');
-        if(m.innerHTML === "") {
-          m.innerHTML = `
-            <div class="glass admin-box">
-              <label style="color:#ff3b30; font-weight:bold;">Admin Tools</label>
-              <div style="margin-bottom:10px; margin-top:5px;">
-                <label>筆の太さ: <span id="brushSizeVal">${brushSize}</span></label>
-                <input type="range" min="1" max="50" value="${brushSize}" oninput="brushSize=this.value;document.getElementById('brushSizeVal').innerText=this.value">
-              </div>
-              <label>スタンプ</label>
-              <input type="file" id="imgInput" accept="image/*">
-              <div style="display:flex; gap:5px; margin-top:5px;">
-                  <input type="number" id="imgW" placeholder="幅" value="64">
-                  <button onclick="loadStamp()" style="background:#007AFF; color:white;">Load</button>
-              </div>
-              <button onclick="if(confirm('本当に全消去しますか？')) { dotsDB.put(null); localChunks={}; }" style="background:#ff3b30; color:white; margin-top:10px;">全データ消去</button>
-            </div>`;
-        }
-      } else {
-        alert("パスワードが違います");
-      }
+   if (check === "MjAzMDIwMg==") {
+    const m = document.getElementById('admin-mount');
+    if(m.innerHTML === "") {
+     m.innerHTML = `
+      <div class="glass admin-box">
+       <label style="color:#ff3b30; font-weight:bold;">Admin Tools</label>
+       <div style="margin-bottom:10px; margin-top:5px;">
+        <label>筆の太さ: <span id="brushSizeVal">${}</span></label>
+        <input type="range" min="1" max="50" value="${}" oninput="brushSize=this.value;document.getElementById('brushSizeVal').innerText=this.value">
+       </div>
+       <label>スタンプ</label>
+       <input type="file" id="imgInput" accept="image/*">
+       <div style="display:flex; gap:5px; margin-top:5px;">
+         <input type="number" id="imgW" placeholder="幅" value="64">
+         <button onclick="loadStamp()" style="background:#007AFF; color:white;">Load</button>
+       </div>
+       <button onclick="if(confirm('本当に全消去しますか？')) { dotsDB.put(null); localChunks={}; }" style="background:#ff3b30; color:white; margin-top:10px;">全データ消去</button>
+      </div>`;
     }
-  });
+   } else {
+    alert("パスワードが違います");
+   }
+  }
+ });
 
-  let stampData=null;
-  window.loadStamp=()=>{const f=document.getElementById('imgInput').files[0];if(!f)return;const r=new FileReader();r.onload=e=>{const img=new Image();img.onload=()=>{const w=parseInt(document.getElementById('imgW').value)||50,h=Math.floor(w*(img.height/img.width));const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d');ctx.drawImage(img,0,0,w,h);const d=ctx.getImageData(0,0,w,h).data;stampData=[];for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*4;if(d[i+3]>128)stampData.push({x,y,hex:"#"+((1<<24)+(d[i]<<16)+(d[i+1]<<8)+d[i+2]).toString(16).slice(1)});}alert("ロード完了。キャンバスをクリックで配置");};img.src=e.target.result;};r.readAsDataURL(f);};
-  canvas.onclick=e=>{if(stampData&&!isDragging){const{wx,wy}=toWorld(e.clientX,e.clientY);let idx=0;const loop=()=>{for(let i=0;i<50&&idx<stampData.length;i++,idx++){const p=stampData[idx];dotsDB.get(`${wx+p.x}_${wy+p.y}`).put(encodeCol(p.hex));updateLocalPixel(wx+p.x,wy+p.y,p.hex);localChannel.postMessage({type:'pixel',x:wx+p.x,y:wy+p.y,c:p.hex});}if(idx<stampData.length)requestAnimationFrame(loop);else stampData=null;};loop();}};
+ let stampData=null;
+ window.loadStamp=()=>{const f=document.getElementById('imgInput').files[0];if(!f)return;const r=new FileReader();r.onload=e=>{const img=new Image();img.onload=()=>{const w=parseInt(document.getElementById('imgW').value)||50,h=Math.floor(w*(img.height/img.width));const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d');ctx.drawImage(img,0,0,w,h);const d=ctx.getImageData(0,0,w,h).data;stampData=[];for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*4;if(d[i+3]>128)stampData.push({x,y,hex:"#"+((1<<24)+(d[i]<<16)+(d[i+1]<<8)+d[i+2]).toString(16).slice(1)});}alert("ロード完了。キャンバスをクリックで配置");};img.src=e.target.result;};r.readAsDataURL(f);};
+ canvas.onclick=e=>{if(stampData&&!isDragging){const{wx,wy}=toWorld(e.clientX,e.clientY);let idx=0;const loop=()=>{for(let i=0;i<50&&idx<stampData.length;i++,idx++){const p=stampData[idx];dotsDB.get(`${wx+p.x}_${wy+p.y}`).put(encodeCol(p.hex));updateLocalPixel(wx+p.x,wy+p.y,p.hex);localChannel.postMessage({type:'pixel',x:wx+p.x,y:wy+p.y,c:p.hex});}if(idx<stampData.length)requestAnimationFrame(loop);else stampData=null;};loop();}};
 
-  render();
+ render();
 </script>
 </body>
 </html>
