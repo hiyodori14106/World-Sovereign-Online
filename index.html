@@ -1,10 +1,10 @@
-<!DOCTYPE html><html lang="ja"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>Global Strategy: Fixed & Optimized</title>  
+<!DOCTYPE html><html lang="ja"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>Global Strategy: Final Robust</title>  
  <!-- Fonts --> <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">  
  <!-- Libraries --> 
  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" /> <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script> 
  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/> <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script> 
  <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
- <!-- Compression Lib (必須) -->
+ <!-- Compression Lib -->
  <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
 
 <style>
@@ -23,7 +23,7 @@
   .res-icon { color: var(--neon-purple); font-weight: bold; }
   button { width: 100%; padding: 10px; margin-bottom: 5px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-family: 'Noto Sans JP'; transition: 0.2s; }
   button:hover { filter: brightness(1.2); }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
   .btn-main { background: var(--neon-blue); color: black; }
   .btn-war { background: var(--neon-red); color: white; }
   .btn-buy { background: var(--neon-green); color: black; }
@@ -51,7 +51,7 @@
   .admin-edit-btn { background: #333; color: #00f3ff; border: 1px solid #555; padding: 2px 5px; font-size: 0.8em; cursor: pointer; }
  </style>
 </head> <body><div id="overlayStart" class="overlay"> <div id="menuMain" class="modal">  <h1>Global Strategy</h1>  <p style="color:#aaa;">領土争奪・国家運営シミュレーション</p>  <div id="loadingMsg" style="color:var(--neon-green); margin-bottom:10px; display:none;">自動ログイン中...</div>  <button class="btn-main" onclick="showScreen('Register')">🌍 新規建国</button>  <button class="btn-buy" onclick="showScreen('Login')">🔑 ログイン</button>  <button class="btn-sub" onclick="startSpectator()">👁️ 観戦モード</button> </div>
- <div id="menuRegister" class="modal hidden">  <h2>新規建国</h2> <input type="text" id="regName" placeholder="国名"> <input type="password" id="regPass" placeholder="パスワード"> <input type="text" id="regCurrency" placeholder="通貨単位 (例: 円, Dollar)"> <button class="btn-main" onclick="register()">作成</button> <button class="btn-sub" onclick="showScreen('Main')">戻る</button> </div>
+ <div id="menuRegister" class="modal hidden">  <h2>新規建国</h2> <input type="text" id="regName" placeholder="国名"> <input type="password" id="regPass" placeholder="パスワード"> <input type="text" id="regCurrency" placeholder="通貨単位 (例: 円, Dollar)"> <button id="btnRegSubmit" class="btn-main" onclick="register()">作成</button> <button class="btn-sub" onclick="showScreen('Main')">戻る</button> </div>
  <div id="menuLogin" class="modal hidden">  <h2>ログイン</h2> <input type="text" id="loginName" placeholder="国名"> <input type="password" id="loginPass" placeholder="パスワード"> <button class="btn-buy" id="loginSubmitBtn" onclick="login()">入国</button> <button class="btn-sub" onclick="showScreen('Main')">戻る</button> </div>
 </div><div id="overlayAdminAuth" class="overlay hidden"> <div class="modal" style="border-color:red;"> <h2>管理者認証</h2> <input type="password" id="adminKey" placeholder="Password"> <button class="btn-war" onclick="attemptAdminLogin()">UNLOCK</button> <button class="btn-sub" onclick="document.getElementById('overlayAdminAuth').classList.add('hidden')">戻る</button> </div> </div><div id="adminPanel" class="hidden"> <h2>⚠️ サーバー管理コンソール</h2> <div style="margin-bottom:10px;"> <button class="btn-sub" style="width:100px;" onclick="closeAdmin()">閉じる</button> <button class="btn-main" style="width:150px;" onclick="refreshAdminList()">リスト更新</button> </div> <table><thead><tr><th>国名</th><th>資金</th><th>幸福</th><th>人口</th><th>面積</th><th>GDP</th><th>操作</th></tr></thead><tbody id="adminTableBody"></tbody></table> </div><div id="gameUI" class="app-container hidden"> 
  <div class="map-section"> <div id="gameMap"></div> <div id="mapMsg" style="position:absolute; top:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.9); padding:15px; border:2px solid var(--neon-gold); color:var(--neon-gold); display:none; z-index:1000; pointer-events:none;"><b>【領土描画モード】</b></div> </div>
@@ -112,7 +112,6 @@
  </div>
 </div>
 <script>
-  // ID変更なし: 安定版IDを使用
   const PANTRY_ID = "5355906c-0f7f-4e97-9c05-65490bfe8f59";
   const BASKET_NAME = "strategy_complete_final";
   const API_URL = `https://getpantry.cloud/apiv1/pantry/${}/basket/${}`;
@@ -124,8 +123,17 @@
   let transferMode = false;
 
   window.onload = function() {
+    // 依存ライブラリのチェック
+    if(typeof LZString === 'undefined') {
+        console.error("LZString not loaded.");
+        // フォールバックロードを試みても良いが、ここではアラート
+    }
+
     const savedName = localStorage.getItem('autoName'), savedPass = localStorage.getItem('autoPass');
-    if(savedName && savedPass) login(savedName, savedPass);
+    if(savedName && savedPass) {
+        document.getElementById('loadingMsg').style.display = 'block';
+        login(savedName, savedPass);
+    }
     
     const liveInd = document.createElement('div');
     liveInd.id = 'liveIndicator';
@@ -145,27 +153,39 @@
   function showScreen(id) { ['Main','Register','Login'].forEach(n => document.getElementById('menu'+n).classList.add('hidden')); document.getElementById('menu'+id).classList.remove('hidden'); }
   function setTab(id) { document.querySelectorAll('[id^="tab-"]').forEach(e => e.classList.add('hidden')); document.getElementById('tab-'+id).classList.remove('hidden'); document.querySelectorAll('.tab').forEach(e => e.classList.remove('active')); event.target.classList.add('active'); if(id === 'rank') updateRanking(); if(id === 'flag') initFlagEditor(); }
 
-  // --- Core Communication (Unified) ---
+  // --- DB Access: Robust & Bulletproof ---
   async function getDB() { 
       try { 
-          const r = await fetch(API_URL + "?t=" + new Date().getTime()); 
+          const r = await fetch(API_URL + "?t=" + Date.now()); 
           if(r.ok) {
-              const raw = await r.json();
+              const text = await r.text();
+              // 空なら空オブジェクト
+              if(!text || text.trim() === "") return { nations: {} };
+              
+              const raw = JSON.parse(text);
+              // 圧縮データの展開
               if(raw.compressed && raw.data) {
                   const decompressed = LZString.decompressFromUTF16(raw.data);
+                  if(!decompressed) return { nations: {} }; // 展開失敗時
                   return JSON.parse(decompressed);
               }
-              return raw; 
+              // 非圧縮データ
+              if(raw.nations) return raw;
+              return { nations: {} };
           }
-      } catch(e){} 
+      } catch(e){ 
+          console.warn("DB Fetch Error (Ignore)", e); 
+      } 
+      // 何があってもObjectを返す
       return { nations: {} }; 
   }
 
-  // ★重要: すべての保存処理をここに集約
+  // --- Unified Save System ---
   async function saveWorldDB(db) {
       if(isSpectator) return;
       isSyncing = true; updateLiveStatus(true);
       try {
+          // 必ず圧縮する
           const compressedStr = LZString.compressToUTF16(JSON.stringify(db));
           await fetch(API_URL, { 
               method:"POST", 
@@ -174,14 +194,14 @@
           });
       } catch(e) { console.error("Save failed", e); }
       isSyncing = false; updateLiveStatus(false);
-      syncWorld();
+      setTimeout(syncWorld, 100); 
   }
   
-  // 自分データを保存するラッパー
   async function saveMe(newData) {
     if(isSyncing || isSpectator) return;
     try {
       const db = await getDB();
+      if(!db.nations) db.nations = {}; // 修復
       db.nations[myName] = newData;
       await saveWorldDB(db);
       myData = newData; 
@@ -196,24 +216,25 @@
 
   function updateLiveStatus(sending) {
     const el = document.getElementById('liveIndicator');
-    el.style.color = sending ? "#ff0055" : "#00ff99";
-    el.innerHTML = sending ? "▲ SENDING..." : "● LIVE SYNC";
+    if(el) {
+        el.style.color = sending ? "#ff0055" : "#00ff99";
+        el.innerHTML = sending ? "▲ SENDING..." : "● LIVE SYNC";
+    }
   }
 
   async function syncWorld() {
     if(isSyncing) return;
     const db = await getDB();
-    if(!db.nations) return;
+    if(!db.nations) return; 
 
     const currentDataStr = JSON.stringify(db.nations);
     if(currentDataStr !== lastWorldDataStr) {
       renderWorld(db.nations);
       lastWorldDataStr = currentDataStr;
       
-      // 自国データの同期
       if(!isSpectator && db.nations[myName] && !expansionMode) {
         const serverMe = db.nations[myName];
-        // クリティカルな数値の同期
+        
         myData.area = serverMe.area;
         myData.geometries = serverMe.geometries;
         myData.warTarget = serverMe.warTarget;
@@ -221,14 +242,16 @@
         myData.allies = serverMe.allies;
         if(serverMe.population !== undefined) myData.population = serverMe.population;
         if(serverMe.happiness !== undefined) myData.happiness = serverMe.happiness;
+        if(serverMe.resources) myData.resources = serverMe.resources;
+
+        // 資金同期: サーバー側で大きく変動（攻撃/送金）のみ採用
+        if(serverMe.money < myData.money - 2000 || serverMe.money > myData.money + 2000) {
+            myData.money = serverMe.money;
+            console.log("資金同期: サーバー値を採用");
+        }
         
-        // 資金が大きく減っている（攻撃された/送金した）場合はサーバー優先
-        if(serverMe.money < myData.money - 2000) myData.money = serverMe.money;
-        
-        // DM受信処理
         if(serverMe.secretMsg) {
             alert(`📩 【極秘DM】\n送信者: ${serverMe.secretMsg.from}\n\n"${serverMe.secretMsg.msg}"\n\n※このメッセージは読後に消滅します。`);
-            // メッセージ消去のために保存
             serverMe.secretMsg = null;
             db.nations[myName] = serverMe;
             await saveWorldDB(db);
@@ -240,7 +263,6 @@
     }
   }
 
-  // --- Spectator ---
   function startSpectator() {
       isSpectator = true;
       document.getElementById('overlayStart').classList.add('hidden');
@@ -252,43 +274,76 @@
       startRealTimeSync();
   }
 
-  // --- Logic ---
+  // --- Registration & Login (Try-Catch Wrapper) ---
   async function register() {
-    const n = document.getElementById('regName').value, p = document.getElementById('regPass').value;
-    const curr = document.getElementById('regCurrency').value || "$";
-    if(!n || !p) return alert("入力不足");
-    const db = await getDB(); if(db.nations && db.nations[n]) return alert("既に使用されています");
-    const newNation = { 
-        pass: p, money: 20000000, population: 50000, gdp: 5000, military: 500, 
-        area: 0, geometries: [], allies: [], requests: [], warTarget: null, flag: null,
-        happiness: 100, currency: curr, resources: { oil: 0, iron: 0 }, secretMsg: null
-    };
-    db.nations[n] = newNation;
-    await saveWorldDB(db);
-    alert("建国完了"); showScreen('Login');
+    const btn = document.getElementById('btnRegSubmit');
+    if(btn) { btn.disabled = true; btn.innerText = "通信中..."; }
+
+    try {
+        const n = document.getElementById('regName').value;
+        const p = document.getElementById('regPass').value;
+        const curr = document.getElementById('regCurrency').value || "$";
+        if(!n || !p) throw new Error("入力不足");
+        
+        const db = await getDB(); 
+        if(!db.nations) db.nations = {};
+
+        if(db.nations[n]) throw new Error("既に使用されています");
+        
+        const newNation = { 
+            pass: p, money: 20000000, population: 50000, gdp: 5000, military: 500, 
+            area: 0, geometries: [], allies: [], requests: [], warTarget: null, flag: null,
+            happiness: 100, currency: curr, resources: { oil: 0, iron: 0 }, secretMsg: null
+        };
+        db.nations[n] = newNation;
+        
+        await saveWorldDB(db); 
+        alert("建国完了"); showScreen('Login');
+    } catch(e) {
+        alert("エラー: " + e.message);
+    } finally {
+        if(btn) { btn.disabled = false; btn.innerText = "作成"; }
+    }
   }
 
   async function login(an, ap) {
-    const n = an || document.getElementById('loginName').value, p = ap || document.getElementById('loginPass').value;
-    if(!n || !p) return;
-    const db = await getDB(); const target = db.nations ? db.nations[n] : null;
-    if(!target || target.pass !== p) { if(!an) alert("認証失敗"); return; }
-    localStorage.setItem('autoName', n); localStorage.setItem('autoPass', p);
-    myName = n; myData = target;
+    const btn = document.getElementById('loginSubmitBtn');
+    if(btn) { btn.disabled = true; btn.innerText = "通信中..."; }
     
-    // データ初期化補正
-    if(!myData.geometries) myData.geometries = []; 
-    if(!myData.allies) myData.allies = []; 
-    if(!myData.requests) myData.requests = [];
-    if(myData.population === undefined) myData.population = 10000;
-    if(myData.happiness === undefined) myData.happiness = 100;
-    if(!myData.resources) myData.resources = { oil: 0, iron: 0 };
-    if(!myData.currency) myData.currency = "$";
-    
-    document.getElementById('overlayStart').classList.add('hidden'); 
-    document.getElementById('gameUI').classList.remove('hidden');
-    initMap(); 
-    startRealTimeSync(); 
+    try {
+        const n = an || document.getElementById('loginName').value;
+        const p = ap || document.getElementById('loginPass').value;
+        if(!n || !p) throw new Error("入力不足");
+        
+        const db = await getDB();
+        const target = db.nations ? db.nations[n] : null;
+        if(!target || target.pass !== p) { 
+            if(!an) throw new Error("認証失敗: 国名かパスワードが違います");
+            else return; // 自動ログイン失敗時は黙って終了
+        }
+        
+        localStorage.setItem('autoName', n); localStorage.setItem('autoPass', p);
+        myName = n; myData = target;
+        
+        // データ補正
+        if(!myData.geometries) myData.geometries = []; 
+        if(!myData.allies) myData.allies = []; 
+        if(!myData.requests) myData.requests = [];
+        if(myData.population === undefined) myData.population = 10000;
+        if(myData.happiness === undefined) myData.happiness = 100;
+        if(!myData.resources) myData.resources = { oil: 0, iron: 0 };
+        if(!myData.currency) myData.currency = "$";
+        
+        document.getElementById('overlayStart').classList.add('hidden'); 
+        document.getElementById('gameUI').classList.remove('hidden');
+        initMap(); 
+        startRealTimeSync(); 
+    } catch(e) {
+        alert(e.message);
+        document.getElementById('loadingMsg').style.display = 'none';
+    } finally {
+        if(btn) { btn.disabled = false; btn.innerText = "入国"; }
+    }
   }
 
   function initMap() {
@@ -302,52 +357,31 @@
       if(target && target !== myName && !isSpectator) selectTarget(target);
     });
     
-    // 領土クリック（譲渡用）
     map.on('click', async e => {
         if(transferMode && selectedTarget) {
             if(selectedTarget === myName) { alert("自分には譲渡できません"); return; }
-            
             const clickedPoint = turf.point([e.latlng.lng, e.latlng.lat]);
             let foundIndex = -1;
-            
-            // 自分の領土のどれをクリックしたか判定
             for(let i=0; i<myData.geometries.length; i++) {
                 if(turf.booleanPointInPolygon(clickedPoint, myData.geometries[i])) {
                     foundIndex = i;
                     break;
                 }
             }
-            
             if(foundIndex !== -1) {
                 if(confirm(`この領土を ${} に譲渡しますか？`)) {
-                    // 最新DBを取得してから処理（整合性のため）
                     const db = await getDB();
-                    if(!db.nations[myName] || !db.nations[selectedTarget]) {
-                        alert("データエラー: 最新情報を取得してください");
-                        return;
-                    }
-                    
-                    // DB上の自分の領土を取得しなおす（myDataは古い可能性がある）
+                    if(!db.nations[myName] || !db.nations[selectedTarget]) { alert("データ同期エラー"); return; }
                     const meInDb = db.nations[myName];
-                    
-                    // DB上で該当ポリゴンを探す（厳密な一致が必要だが、簡易的にインデックスを使用）
-                    // ※インデックスズレのリスクがあるため、本来はID管理推奨だが、ここでは簡略化
-                    // クライアントのmyDataとDBの同期が取れていればfoundIndexでいける
-                    
                     const poly = meInDb.geometries.splice(foundIndex, 1)[0];
-                    if(!poly) { alert("領土が見つかりません(同期ズレ)"); return; }
+                    if(!poly) { alert("領土が見つかりません"); return; }
 
-                    // 面積再計算
                     meInDb.area = 0; meInDb.geometries.forEach(g => { meInDb.area += Math.round(turf.area(g)/1000000); });
-                    
-                    // 相手に追加
                     db.nations[selectedTarget].geometries.push(poly);
                     let areaT = 0; db.nations[selectedTarget].geometries.forEach(g=>areaT += Math.round(turf.area(g)/1000000));
                     db.nations[selectedTarget].area = areaT;
                     
-                    // 保存
                     await saveWorldDB(db);
-                    
                     alert("譲渡完了");
                     cancelActionMode();
                 }
@@ -363,6 +397,7 @@
       let color = isMe ? "#00f3ff" : (isWar ? "#ff8800" : (isAlly ? "#00ff99" : "#ff0055"));
       const fImg = n.flag ? `<img src="${n.flag}" class="pop-flag">` : "";
       const popShow = n.population ? n.population.toLocaleString() : "???";
+      
       (n.geometries || []).forEach(geo => {
         L.geoJSON(geo, { style: { color: color, weight: 2, fillOpacity: 0.3 } })
         .bindPopup(`<div style="text-align:center;">${}<b>${}</b><br>軍事: ${n.military}<br>人口: ${popShow}<br>幸福: ${n.happiness || 100}%</div>`).addTo(drawnItems);
@@ -375,7 +410,7 @@
     expansionMode = true; 
     document.getElementById('mapMsg').innerText="【領土購入モード】"; 
     document.getElementById('mapMsg').style.display = 'block';
-    document.getElementById('cancelOverlay').style.display = 'block'; // キャンセルボタン表示
+    document.getElementById('cancelOverlay').style.display = 'block'; 
 
     if(drawControl) map.removeControl(drawControl);
     drawControl = new L.Control.Draw({ draw: { polygon: { allowIntersection: false }, rectangle:true, circle:false, marker:false, polyline:false }, edit: false });
@@ -390,7 +425,7 @@
       Object.keys(db.nations).forEach(k => { if(k !== myName) (db.nations[k].geometries || []).forEach(g => { if(turf.intersect(newGeo, g)) overlap = true; }); });
       if(overlap) { alert("他国領土と重複しています"); return; }
       
-      const a = Math.round(L.GeometryUtil.geodesicArea(e.layer.getLatLngs()[0])/1000000);
+      const a = Math.round(turf.area(newGeo)/1000000); 
       const cost = myData.area === 0 ? 0 : a * 100;
       
       if(myData.money >= cost && confirm(`費用 ${cost.toLocaleString()}${myData.currency} で購入しますか？`)) {
@@ -420,18 +455,14 @@
   async function ecoTick() { 
     if(!myData.gdp || isSpectator) return;
     
-    // 維持費計算（修正：マイナスにならず、維持できない兵が消える）
     const upkeep = myData.military * 2; 
     if(myData.money >= upkeep) {
         myData.money -= upkeep;
     } else {
-        // お金で払える分だけ維持
         const affordable = Math.floor(myData.money / 2);
-        const desertion = myData.military - affordable;
-        myData.military = affordable; // 払える分だけ残る
+        myData.military = affordable; 
         myData.money = 0;
-        myData.happiness = Math.max(0, myData.happiness - 2); // 不払いによる幸福度低下
-        if(desertion > 0) console.log(`${desertion} 名が逃亡`);
+        myData.happiness = Math.max(0, myData.happiness - 2); 
     }
 
     const taxRate = parseInt(document.getElementById('taxRate').value);
@@ -465,7 +496,6 @@
     if(!en) { myData.warTarget = null; return; }
     if(en.population === undefined) en.population = 0;
     
-    // 戦闘ロジック
     if(myData.military * (0.6 + Math.random()) > en.military * (0.6 + Math.random())) {
        const sA = Math.floor(en.area * 0.1);
        const sG = Math.floor(en.gdp * 0.1);
@@ -501,10 +531,9 @@
     }
     
     db.nations[myName] = myData; 
-    await saveWorldDB(db); // 戦争結果保存
+    await saveWorldDB(db); 
   }
 
-  // --- Actions ---
   function invest() { if(myData.money>=2000){myData.money-=2000; myData.gdp+=500; refreshUI(); saveMe(myData);} }
   function recruit() { if(myData.money>=1000 && myData.population>=500){myData.money-=1000; myData.population-=500; myData.military+=250; refreshUI(); saveMe(myData);} else { alert("資金または人口が不足"); } }
   function draftSoldiers() { if(confirm("【緊急徴兵】\n軍事+2000 / 人口-2000 / 幸福-20")) { if(myData.population >= 2000) { myData.population -= 2000; myData.military += 2000; myData.happiness = Math.max(0, myData.happiness - 20); refreshUI(); saveMe(myData); } else { alert("人口不足"); } } }
@@ -516,7 +545,7 @@
       const msg = prompt(`【密書送信】宛先: ${}`);
       if(msg) {
           const db = await getDB();
-          if(db.nations[selectedTarget]) {
+          if(db.nations && db.nations[selectedTarget]) {
               db.nations[selectedTarget].secretMsg = { from: myName, msg: msg };
               await saveWorldDB(db);
               alert("送信完了");
@@ -524,7 +553,6 @@
       }
   }
 
-  // 送金
   async function sendMoney() {
       if(!selectedTarget) return;
       const amountStr = prompt(`【資金援助】\n相手: ${}\n送金額を入力:`);
@@ -532,20 +560,19 @@
       if(amount && amount > 0 && myData.money >= amount) {
           myData.money -= amount;
           const db = await getDB();
-          if(db.nations[selectedTarget]) {
+          if(db.nations && db.nations[selectedTarget]) {
               db.nations[selectedTarget].money += amount;
-              db.nations[myName] = myData; // 自分の減額も反映
+              db.nations[myName] = myData; 
               await saveWorldDB(db);
               refreshUI();
               alert(`送金完了: ${amount}`);
           } else {
-             alert("送信先が存在しません（滅亡した可能性があります）");
-             myData.money += amount; // 返金
+             alert("送信先が存在しません");
+             myData.money += amount;
           }
       } else { alert("資金不足または無効な数値"); }
   }
 
-  // 領土譲渡開始
   function startTransferGeo() {
       if(!selectedTarget) return;
       alert("【領土譲渡モード】\nマップ上の「自分の領土」をクリックすると、その土地を相手に譲渡します。");
@@ -631,7 +658,6 @@
   async function adminEdit(c,k,v){ let n=prompt("変更後",v); if(n!==null){ const db=await getDB(); db.nations[c][k]=(k==='pass'?n:Number(n)); await saveWorldDB(db); refreshAdminList(); }}
   async function del(n){ if(confirm("削除？")){ const db=await getDB(); delete db.nations[n]; await saveWorldDB(db); refreshAdminList(); }}
 
-  // --- 国旗 ---
   let flagCtx, fCur="#fff", fDraw=false;
   function initFlagEditor() {
     const c = document.getElementById('flagCanvas'); flagCtx = c.getContext('2d');
