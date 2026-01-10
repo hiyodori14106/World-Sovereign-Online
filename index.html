@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>無限キャンバス</title>
+    <title>Infinite Canvas Ultimate</title>
     <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
     <style>
         :root { --primary: #007AFF; --bg: #ffffff; --ui-bg: rgba(255, 255, 255, 0.85); --text: #333; --shadow: 0 8px 32px rgba(0,0,0,0.1); }
@@ -32,7 +32,7 @@
         .swatch.active { border-color: var(--primary); transform: scale(1.1); }
 
         /* Admin Box */
-        .admin-box { border: 2px solid #ff3b30; background: rgba(255, 235, 235, 0.9); display: none; margin-top: 10px; }
+        .admin-box { border: 2px solid #ff3b30; background: rgba(255, 235, 235, 0.9); display: block; margin-top: 10px; }
         .admin-btn { background: #007AFF; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 8px; font-weight: bold; }
         .danger-btn { background: #ff3b30; }
 
@@ -97,20 +97,29 @@ function setLanguage(lang) {
 // --- 管理者(2020302) ---
 const ADMIN_HASH = "3884b294060851f5c643b9e4073e51d951522f986427382d56d7827827e8a93a";
 async function sha256(m){const b=new TextEncoder().encode(m);const h=await crypto.subtle.digest('SHA-256',b);return Array.from(new Uint8Array(h)).map(x=>x.toString(16).padStart(2,'0')).join('');}
-window.onkeydown = async (e) => {
-    if (e.shiftKey && e.ctrlKey && e.altKey && e.key === 'A') {
-        const p = prompt("Access Code:");
-        if (await sha256(p) === ADMIN_HASH) activateAdmin();
-    }
-};
 
-let pendingImage = null; // 画像スタンプ用
+// キーイベント判定の修正 (Shift+Ctrl+Alt+A)
+window.addEventListener('keydown', async (e) => {
+    if (e.shiftKey && e.ctrlKey && e.altKey && (e.key === 'a' || e.key === 'A' || e.keyCode === 65)) {
+        const p = prompt("Enter Admin Password:");
+        if (!p) return;
+        const hashed = await sha256(p);
+        if (hashed === ADMIN_HASH) {
+            activateAdmin();
+            alert("Admin Mode: Access Granted.");
+        } else {
+            alert("Access Denied.");
+        }
+    }
+});
+
+let pendingImage = null; 
 
 function activateAdmin() {
     isAdmin = true;
     document.getElementById('admin-brush-ui').style.display = 'block';
     document.getElementById('admin-mount').innerHTML = `
-        <div class="glass admin-box" style="display:block;">
+        <div class="glass admin-box">
             <h2 style="color:#d00;">GOD MODE</h2>
             <label>IMPORT IMAGE</label><input type="file" id="imageInput" accept="image/*">
             <label style="margin-top:5px;">SIZE (px)</label><input type="number" id="imgSize" value="50">
@@ -124,7 +133,7 @@ function activateAdmin() {
 const PANTRY_ID = "1236839c-7644-4b65-881d-e65dc707e34e"; 
 const PANTRY_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/world_data_v2`;
 const gun = Gun(['https://gun-manhattan.herokuapp.com/gun']);
-const db = gun.get('infinite_canvas_ultimate_v5');
+const db = gun.get('infinite_canvas_ultimate_v6'); // データ競合を避けるためバージョン上げ
 const dotsDB = db.get('dots'), cursorDB = db.get('cursors'), chatDB = db.get('chat');
 
 const canvas = document.getElementById('gameCanvas');
@@ -141,21 +150,18 @@ function render() {
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
     ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
 
-    // ドット描画
     for(let k in localDots){
         const [x,y]=k.split(',').map(Number); const s=toScreen(x,y);
         if(s.x>-zoom&&s.x<canvas.width&&s.y>-zoom&&s.y<canvas.height){ ctx.fillStyle=localDots[k]; ctx.fillRect(s.x,s.y,zoom+0.5,zoom+0.5); }
     }
 
-    // ガイド描画 (灰色)
+    // ガイド描画
     if (hoverPos) {
-        ctx.fillStyle = "rgba(150, 150, 150, 0.4)";
+        ctx.fillStyle = "rgba(200, 200, 200, 0.5)";
         if (pendingImage) {
-            // 画像スタンプガイド
             const s = toScreen(hoverPos.wx, hoverPos.wy);
             ctx.fillRect(s.x, s.y, pendingImage.w * zoom, pendingImage.h * zoom);
         } else {
-            // 筆ガイド
             const r = Math.floor((brushSize - 1) / 2);
             const s = toScreen(hoverPos.wx - r, hoverPos.wy - r);
             ctx.fillRect(s.x, s.y, brushSize * zoom, brushSize * zoom);
@@ -166,10 +172,9 @@ function render() {
 
 function paint(x, y) {
     if (pendingImage) {
-        // 画像を配置
         const s = toWorld(x, y);
         pendingImage.data.forEach(p => dotsDB.get(`${s.wx + p.x},${s.wy + p.y}`).put(p.hex));
-        pendingImage = null; // 貼り付けたら終了
+        pendingImage = null;
         return;
     }
     const pos = toWorld(x, y); const color = document.getElementById('colorPicker').value;
@@ -193,15 +198,10 @@ window.onmouseup = () => isPainting = isDragging = false;
 window.onwheel = (e) => zoom = Math.min(Math.max(zoom * (e.deltaY > 0 ? 0.85 : 1.15), 1), 80);
 canvas.oncontextmenu = e => e.preventDefault();
 
-// タッチ
 canvas.addEventListener('touchstart', e => {
     e.preventDefault(); const t = e.touches[0]; hoverPos = toWorld(t.clientX, t.clientY);
     if (e.touches.length === 1) { isPainting = true; paint(t.clientX, t.clientY); }
     else { isDragging = true; lastP = {x: (e.touches[0].pageX + e.touches[1].pageX)/2, y: (e.touches[0].pageY + e.touches[1].pageY)/2}; }
-}, {passive:false});
-canvas.addEventListener('touchmove', e => {
-    e.preventDefault(); const t = e.touches[0]; hoverPos = toWorld(t.clientX, t.clientY);
-    if (e.touches.length === 1 && isPainting) paint(t.clientX, t.clientY);
 }, {passive:false});
 
 function setupAdminEvents() {
@@ -221,14 +221,12 @@ function setupAdminEvents() {
                     if(d[i+3] > 128) pixels.push({x, y, hex: "#" + ((1 << 24) + (d[i] << 16) + (d[i+1] << 8) + d[i+2]).toString(16).slice(1)});
                 }
                 pendingImage = { data: pixels, w: tempC.width, h: tempC.height };
-                alert("Image loaded! Click on canvas to stamp.");
             }; img.src = ev.target.result;
         }; reader.readAsDataURL(e.target.files[0]);
     };
     document.getElementById('brushSizeInput').oninput = (e) => { brushSize = e.target.value; document.getElementById('brushSizeVal').innerText = brushSize; };
 }
 
-// UI
 const colors = ["#000000", "#FFFFFF", "#FF3B30", "#FF9500", "#FFCC00", "#4CD964", "#5AC8FA", "#007AFF", "#5856D6", "#AF52DE", "#FF2D55", "#8E8E93"];
 colors.forEach(c => {
     const s = document.createElement('div'); s.className = 'swatch'; s.style.backgroundColor = c;
