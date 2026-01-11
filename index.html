@@ -46,21 +46,21 @@
 <div id="ui-container">
  <button id="menu-btn" onclick="document.getElementById('main-panel').classList.toggle('hidden')">☰</button>
  <div id="main-panel" class="glass">
-  <h2>Infinite Canvas</h2>
-  <div class="status">
-   <span id="coordDisplay">0, 0</span>
-   <span id="saveStatus">Connecting...</span>
-  </div>
-   
-  <input type="text" id="nameInput" placeholder="名前を入力" maxlength="10">
-   
-  <div class="row">
-   <div id="colorPreview"><input type="color" id="colorPicker" value="#000000"></div>
-   <button id="eraserBtn" title="消しゴム">🧹</button>
-  </div>
-   
-  <div id="palette" class="palette"></div>
-  <div id="admin-mount"></div>
+ <h2>Infinite Canvas</h2>
+ <div class="status">
+  <span id="coordDisplay">0, 0</span>
+  <span id="saveStatus">Connecting...</span>
+ </div>
+  
+ <input type="text" id="nameInput" placeholder="名前を入力" maxlength="10">
+  
+ <div class="row">
+  <div id="colorPreview"><input type="color" id="colorPicker" value="#000000"></div>
+  <button id="eraserBtn" title="消しゴム">🧹</button>
+ </div>
+  
+ <div id="palette" class="palette"></div>
+ <div id="admin-mount"></div>
  </div>
 </div>
 
@@ -74,21 +74,22 @@
 
 <script>
 // --- 1. 初期設定 ---
+// 注意: このIDは誰でも書き込める共有IDです。本番運用時は https://getpantry.cloud で自分のIDを取得して書き換えてください。
 const PANTRY_ID = "b1ff8b72-63c0-469d-9bbe-b006c5751552";
 const PANTRY_URL = "https://getpantry.cloud/apiv1/pantry/" + PANTRY_ID + "/basket/canvas_pixel_data";
 const localChannel = new BroadcastChannel('inf_canvas_v15_fix');
 
-// Gun.js 設定
+// Gun.js 設定 (修正箇所: 稼働しているピアに変更)
 const gun = Gun({
  peers: [
-  'https://gun-manhattan.herokuapp.com/gun',
-  'https://gun-us.herokuapp.com/gun',
-  'https://gun-eu.herokuapp.com/gun'
+  'https://gun-manhattan.herokuapp.com/gun', // 旧URL(予備)
+  'https://peer.wallie.io/gun',             // コミュニティ運営の安定ピア
+  'https://relay.peers.gun.eco/gun'         // Gunエコシステムのリレー
  ],
  localStorage: true
 });
 
-const APP_KEY = 'inf_canvas_v15_fixed';
+const APP_KEY = 'inf_canvas_v15_fixed_online'; // キーを変更して競合回避
 const db = gun.get(APP_KEY);
 const dotsDB = db.get('dots');
 const chatDB = db.get('chat');
@@ -114,7 +115,7 @@ function encodeCol(c) {
 function decodeCol(c) {
  if(!c) return null;
  if(c.length <= 2 && /^[0-9A-Fa-f]+$/.test(c)) {
-  return paletteColors[parseInt(c, 16)] || c;
+ return paletteColors[parseInt(c, 16)] || c;
  }
  return c;
 }
@@ -137,32 +138,39 @@ function updateLocalPixel(wx, wy, color) {
  const k = lx + "_" + ly;
 
  if (color === null) {
-  delete localChunks[cid][k];
-  if (Object.keys(localChunks[cid]).length === 0) delete localChunks[cid];
+ delete localChunks[cid][k];
+ if (Object.keys(localChunks[cid]).length === 0) delete localChunks[cid];
  } else {
-  localChunks[cid][k] = color;
+ localChunks[cid][k] = color;
  }
 }
 
-// Pantry 読み込み
+// Pantry 読み込み (修正: エラーハンドリング強化)
 async function loadFromPantry() {
  try {
-  document.getElementById('saveStatus').innerText = "Loading (Pantry)...";
-  const res = await fetch(PANTRY_URL);
-  if(!res.ok) throw new Error("Empty");
+ document.getElementById('saveStatus').innerText = "Loading (Pantry)...";
+ const res = await fetch(PANTRY_URL);
+ 
+ if(!res.ok) {
+  // バスケットが存在しない場合は無視して新規作成へ
+  console.log("Pantry basket not found, starting fresh.");
+  document.getElementById('saveStatus').innerText = "Ready (New)";
+  return;
+ }
   
-  const json = await res.json();
-  const pixels = json.pixels || {};
+ const json = await res.json();
+ const pixels = json.pixels || {};
   
-  for(let key in pixels) {
-   const parts = key.split('_');
-   const x = parseInt(parts[0]);
-   const y = parseInt(parts[1]);
-   updateLocalPixel(x, y, decodeCol(pixels[key]));
-  }
-  document.getElementById('saveStatus').innerText = "Sync OK";
+ for(let key in pixels) {
+  const parts = key.split('_');
+  const x = parseInt(parts[0]);
+  const y = parseInt(parts[1]);
+  updateLocalPixel(x, y, decodeCol(pixels[key]));
+ }
+ document.getElementById('saveStatus').innerText = "Sync OK";
  } catch(e) { 
-  document.getElementById('saveStatus').innerText = "Ready"; 
+ console.error(e);
+ document.getElementById('saveStatus').innerText = "Ready (Offline)"; 
  }
 }
 
@@ -172,33 +180,33 @@ const saveToPantry = async () => {
  const flatData = {};
  
  for(let cid in localChunks) {
-  const parts = cid.split('_');
-  const cx = parseInt(parts[0]);
-  const cy = parseInt(parts[1]);
-  const chunk = localChunks[cid];
+ const parts = cid.split('_');
+ const cx = parseInt(parts[0]);
+ const cy = parseInt(parts[1]);
+ const chunk = localChunks[cid];
   
-  for(let k in chunk) {
-   const lParts = k.split('_');
-   const lx = parseInt(lParts[0]);
-   const ly = parseInt(lParts[1]);
-   
-   const globalX = cx * CHUNK_SIZE + lx;
-   const globalY = cy * CHUNK_SIZE + ly;
-   flatData[globalX + "_" + globalY] = encodeCol(chunk[k]);
-  }
+ for(let k in chunk) {
+  const lParts = k.split('_');
+  const lx = parseInt(lParts[0]);
+  const ly = parseInt(lParts[1]);
+  
+  const globalX = cx * CHUNK_SIZE + lx;
+  const globalY = cy * CHUNK_SIZE + ly;
+  flatData[globalX + "_" + globalY] = encodeCol(chunk[k]);
+ }
  }
 
  if(Object.keys(flatData).length > 0) {
-  try {
-   await fetch(PANTRY_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pixels: flatData, updated: Date.now() })
-   });
-   document.getElementById('saveStatus').innerText = "Saved";
-  } catch(e) { 
-   document.getElementById('saveStatus').innerText = "Retry"; 
-  }
+ try {
+  await fetch(PANTRY_URL, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ pixels: flatData, updated: Date.now() })
+  });
+  document.getElementById('saveStatus').innerText = "Saved";
+ } catch(e) { 
+  document.getElementById('saveStatus').innerText = "Retry"; 
+ }
  }
 };
 
@@ -234,9 +242,9 @@ dotsDB.map().on(function(d, k) {
 
 setTimeout(function() {
  if(!gunReceivedData) {
-   loadFromPantry();
+  loadFromPantry();
  } else {
-   document.getElementById('saveStatus').innerText = "Sync (Gun)";
+  document.getElementById('saveStatus').innerText = "Sync (Gun)";
  }
 }, 2000);
 
@@ -266,45 +274,45 @@ cursorDB.map().on(function(d, id) {
 
 function toScreen(wx, wy) {
  return {
-  x: Math.floor((wx-camX)*zoom + canvas.width/2), 
-  y: Math.floor((wy-camY)*zoom + canvas.height/2)
+ x: Math.floor((wx-camX)*zoom + canvas.width/2), 
+ y: Math.floor((wy-camY)*zoom + canvas.height/2)
  };
 }
 
 function toWorld(sx, sy) {
  return {
-  wx: Math.floor((sx-canvas.width/2)/zoom + camX), 
-  wy: Math.floor((sy-canvas.height/2)/zoom + camY)
+ wx: Math.floor((sx-canvas.width/2)/zoom + camX), 
+ wy: Math.floor((sy-canvas.height/2)/zoom + camY)
  };
 }
 
 function render() {
  if(canvas.width !== window.innerWidth || canvas.height !== window.innerHeight){
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+ canvas.width = window.innerWidth;
+ canvas.height = window.innerHeight;
  }
  ctx.fillStyle='#e5e5e5'; 
  ctx.fillRect(0,0,canvas.width,canvas.height);
 
  // グリッド線
  if(zoom > 8) {
-  ctx.beginPath(); 
-  ctx.strokeStyle="rgba(0,0,0,0.08)"; 
-  ctx.lineWidth=1;
-  const s = toWorld(0,0);
-  const e = toWorld(canvas.width, canvas.height);
+ ctx.beginPath(); 
+ ctx.strokeStyle="rgba(0,0,0,0.08)"; 
+ ctx.lineWidth=1;
+ const s = toWorld(0,0);
+ const e = toWorld(canvas.width, canvas.height);
   
-  for(let x=s.wx; x<=e.wx; x++) { 
-   const p = toScreen(x,0); 
-   ctx.moveTo(p.x, 0); 
-   ctx.lineTo(p.x, canvas.height); 
-  }
-  for(let y=s.wy; y<=e.wy; y++) { 
-   const p = toScreen(0,y); 
-   ctx.moveTo(0, p.y); 
-   ctx.lineTo(canvas.width, p.y); 
-  }
-  ctx.stroke();
+ for(let x=s.wx; x<=e.wx; x++) { 
+  const p = toScreen(x,0); 
+  ctx.moveTo(p.x, 0); 
+  ctx.lineTo(p.x, canvas.height); 
+ }
+ for(let y=s.wy; y<=e.wy; y++) { 
+  const p = toScreen(0,y); 
+  ctx.moveTo(0, p.y); 
+  ctx.lineTo(canvas.width, p.y); 
+ }
+ ctx.stroke();
  }
 
  // ドット描画
@@ -316,48 +324,48 @@ function render() {
  const eCY = Math.floor(eW.wy/CHUNK_SIZE);
 
  for(let cy=sCY; cy<=eCY; cy++) {
-  for(let cx=sCX; cx<=eCX; cx++) {
-   const chunk = localChunks[cx + "_" + cy];
-   if(!chunk) continue;
+ for(let cx=sCX; cx<=eCX; cx++) {
+  const chunk = localChunks[cx + "_" + cy];
+  if(!chunk) continue;
+  
+  const ox = cx * CHUNK_SIZE;
+  const oy = cy * CHUNK_SIZE;
+  
+  for(let k in chunk) {
+  const parts = k.split('_');
+  const lx = parseInt(parts[0]);
+  const ly = parseInt(parts[1]);
    
-   const ox = cx * CHUNK_SIZE;
-   const oy = cy * CHUNK_SIZE;
-   
-   for(let k in chunk) {
-    const parts = k.split('_');
-    const lx = parseInt(parts[0]);
-    const ly = parseInt(parts[1]);
-    
-    const scr = toScreen(ox+lx, oy+ly);
-    ctx.fillStyle = chunk[k]; 
-    ctx.fillRect(scr.x, scr.y, Math.ceil(zoom), Math.ceil(zoom));
-   }
+  const scr = toScreen(ox+lx, oy+ly);
+  ctx.fillStyle = chunk[k]; 
+  ctx.fillRect(scr.x, scr.y, Math.ceil(zoom), Math.ceil(zoom));
   }
+ }
  }
 
  // カーソル
  if (hoverPos) {
-  const b = parseInt(brushSize);
-  const off = Math.floor((b-1)/2);
-  ctx.strokeStyle = isEraser ? "#ff3b30" : "rgba(0,0,0,0.5)"; 
-  ctx.lineWidth = 2;
-  const s = toScreen(hoverPos.wx-off, hoverPos.wy-off);
-  ctx.strokeRect(s.x, s.y, b*zoom, b*zoom);
+ const b = parseInt(brushSize);
+ const off = Math.floor((b-1)/2);
+ ctx.strokeStyle = isEraser ? "#ff3b30" : "rgba(0,0,0,0.5)"; 
+ ctx.lineWidth = 2;
+ const s = toScreen(hoverPos.wx-off, hoverPos.wy-off);
+ ctx.strokeRect(s.x, s.y, b*zoom, b*zoom);
  }
 
  // 他ユーザー
  const now = Date.now();
  for(let id in otherCursors){
-  const c = otherCursors[id];
-  if(now - c.t > 5000) continue;
-  const s = toScreen(c.x, c.y);
-  ctx.fillStyle = c.col || "#333"; 
-  ctx.beginPath(); 
-  ctx.arc(s.x, s.y, 5, 0, Math.PI*2); 
-  ctx.fill();
-  ctx.fillStyle = "black"; 
-  ctx.font = "11px sans-serif"; 
-  ctx.fillText(c.n, s.x+8, s.y+4);
+ const c = otherCursors[id];
+ if(now - c.t > 5000) continue;
+ const s = toScreen(c.x, c.y);
+ ctx.fillStyle = c.col || "#333"; 
+ ctx.beginPath(); 
+ ctx.arc(s.x, s.y, 5, 0, Math.PI*2); 
+ ctx.fill();
+ ctx.fillStyle = "black"; 
+ ctx.font = "11px sans-serif"; 
+ ctx.fillText(c.n, s.x+8, s.y+4);
  }
  requestAnimationFrame(render);
 }
@@ -368,27 +376,27 @@ function paint(wx, wy) {
  const r = Math.floor((b-1)/2);
  
  for(let dx = -r; dx <= r + (b%2===0?1:0); dx++) {
-  for(let dy = -r; dy <= r + (b%2===0?1:0); dy++) {
-   if(b > 1 && dx*dx + dy*dy > r*r + 1) continue;
-   
-   const tx = wx + dx;
-   const ty = wy + dy;
-   const cid = getChunkId(tx, ty);
-   
-   const lx = ((tx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
-   const ly = ((ty % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
-   const k = lx + "_" + ly;
+ for(let dy = -r; dy <= r + (b%2===0?1:0); dy++) {
+  if(b > 1 && dx*dx + dy*dy > r*r + 1) continue;
+  
+  const tx = wx + dx;
+  const ty = wy + dy;
+  const cid = getChunkId(tx, ty);
+  
+  const lx = ((tx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+  const ly = ((ty % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+  const k = lx + "_" + ly;
 
-   // 変更がある場合のみ更新
-   let current = null;
-   if(localChunks[cid]) current = localChunks[cid][k];
-   
-   if(current !== color) {
-    dotsDB.get(tx + "_" + ty).put(encodeCol(color));
-    updateLocalPixel(tx, ty, color);
-    localChannel.postMessage({type:'pixel', x:tx, y:ty, c:color});
-   }
+  // 変更がある場合のみ更新
+  let current = null;
+  if(localChunks[cid]) current = localChunks[cid][k];
+  
+  if(current !== color) {
+  dotsDB.get(tx + "_" + ty).put(encodeCol(color));
+  updateLocalPixel(tx, ty, color);
+  localChannel.postMessage({type:'pixel', x:tx, y:ty, c:color});
   }
+ }
  }
 }
 
@@ -396,12 +404,12 @@ function paint(wx, wy) {
 canvas.onmousedown = function(e) {
  const w = toWorld(e.clientX, e.clientY);
  if(e.button === 0 && !e.shiftKey) {
-  isPainting = true;
-  paint(w.wx, w.wy);
+ isPainting = true;
+ paint(w.wx, w.wy);
  } else {
-  isDragging = true;
-  lastMouse = {x: e.clientX, y: e.clientY};
-  canvas.style.cursor = "grabbing";
+ isDragging = true;
+ lastMouse = {x: e.clientX, y: e.clientY};
+ canvas.style.cursor = "grabbing";
  }
 };
 
@@ -412,18 +420,18 @@ window.onmousemove = function(e) {
  
  if(isPainting) paint(w.wx, w.wy);
  if(isDragging) {
-  camX -= (e.clientX - lastMouse.x) / zoom;
-  camY -= (e.clientY - lastMouse.y) / zoom;
-  lastMouse = {x: e.clientX, y: e.clientY};
+ camX -= (e.clientX - lastMouse.x) / zoom;
+ camY -= (e.clientY - lastMouse.y) / zoom;
+ lastMouse = {x: e.clientX, y: e.clientY};
  }
  if(Math.random() < 0.3) {
-  cursorDB.get(myId).put({
-   x: w.wx, 
-   y: w.wy, 
-   n: myName, 
-   t: Date.now(), 
-   col: document.getElementById('colorPicker').value
-  });
+ cursorDB.get(myId).put({
+  x: w.wx, 
+  y: w.wy, 
+  n: myName, 
+  t: Date.now(), 
+  col: document.getElementById('colorPicker').value
+ });
  }
 };
 
@@ -439,35 +447,35 @@ let initZ = 20;
 
 canvas.ontouchstart = function(e) {
  if(e.touches.length === 1) {
-  canvas.onmousedown({
-   clientX: e.touches[0].clientX,
-   clientY: e.touches[0].clientY,
-   button: 0,
-   shiftKey: false,
-   target: canvas
-  });
+ canvas.onmousedown({
+  clientX: e.touches[0].clientX,
+  clientY: e.touches[0].clientY,
+  button: 0,
+  shiftKey: false,
+  target: canvas
+ });
  } else if(e.touches.length === 2) {
-  isDragging = false;
-  isPainting = false;
-  const dx = e.touches[0].clientX - e.touches[1].clientX;
-  const dy = e.touches[0].clientY - e.touches[1].clientY;
-  initDist = Math.hypot(dx, dy);
-  initZ = zoom;
+ isDragging = false;
+ isPainting = false;
+ const dx = e.touches[0].clientX - e.touches[1].clientX;
+ const dy = e.touches[0].clientY - e.touches[1].clientY;
+ initDist = Math.hypot(dx, dy);
+ initZ = zoom;
  }
 };
 
 canvas.ontouchmove = function(e) {
  e.preventDefault();
  if(e.touches.length === 1) {
-  window.onmousemove({
-   clientX: e.touches[0].clientX,
-   clientY: e.touches[0].clientY
-  });
+ window.onmousemove({
+  clientX: e.touches[0].clientX,
+  clientY: e.touches[0].clientY
+ });
  } else if(e.touches.length === 2) {
-  const dx = e.touches[0].clientX - e.touches[1].clientX;
-  const dy = e.touches[0].clientY - e.touches[1].clientY;
-  const dist = Math.hypot(dx, dy);
-  zoom = Math.min(Math.max(initZ * (dist / initDist), 2), 100);
+ const dx = e.touches[0].clientX - e.touches[1].clientX;
+ const dy = e.touches[0].clientY - e.touches[1].clientY;
+ const dist = Math.hypot(dx, dy);
+ zoom = Math.min(Math.max(initZ * (dist / initDist), 2), 100);
  }
 };
 
@@ -485,9 +493,9 @@ paletteColors.forEach(function(c) {
  s.className = 'swatch';
  s.style.background = c;
  s.onclick = function() {
-  isEraser = false;
-  document.getElementById('eraserBtn').classList.remove('active');
-  document.getElementById('colorPicker').value = c;
+ isEraser = false;
+ document.getElementById('eraserBtn').classList.remove('active');
+ document.getElementById('colorPicker').value = c;
  };
  pCon.appendChild(s);
 });
@@ -504,44 +512,44 @@ document.getElementById('nameInput').onchange = function(e) {
 
 document.getElementById('chat-input').onkeypress = function(e) {
  if(e.key === 'Enter' && e.target.value.trim() !== "") {
-  const t = e.target.value.substring(0, 100);
-  chatDB.get(Date.now()).put({u: myName, t: t});
-  localChannel.postMessage({type: 'chat', u: myName, t: t});
-  e.target.value = "";
+ const t = e.target.value.substring(0, 100);
+ chatDB.get(Date.now()).put({u: myName, t: t});
+ localChannel.postMessage({type: 'chat', u: myName, t: t});
+ e.target.value = "";
  }
 };
 
 // --- 管理者機能 ---
 window.addEventListener('keydown', function(e) {
  if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'a') {
-  const input = prompt("Admin Password:");
-  if (!input) return;
+ const input = prompt("Admin Password:");
+ if (!input) return;
 
-  const reversedInput = input.trim().split('').reverse().join('');
-  const check = btoa(reversedInput);
+ const reversedInput = input.trim().split('').reverse().join('');
+ const check = btoa(reversedInput);
 
-  if (check === "MjAzMDIwMg==") {
-   const m = document.getElementById('admin-mount');
-   if(m.innerHTML === "") {
-    m.innerHTML = 
-     '<div class="glass admin-box">' +
-      '<label style="color:#ff3b30; font-weight:bold;">Admin Tools</label>' +
-      '<div style="margin-bottom:10px; margin-top:5px;">' +
-       '<label>筆の太さ: <span id="brushSizeVal">' + brushSize + '</span></label>' +
-       '<input type="range" min="1" max="50" value="' + brushSize + '" oninput="brushSize=this.value;document.getElementById(\'brushSizeVal\').innerText=this.value">' +
-      '</div>' +
-      '<label>スタンプ</label>' +
-      '<input type="file" id="imgInput" accept="image/*">' +
-      '<div style="display:flex; gap:5px; margin-top:5px;">' +
-        '<input type="number" id="imgW" placeholder="幅" value="64">' +
-        '<button onclick="loadStamp()" style="background:#007AFF; color:white;">Load</button>' +
-      '</div>' +
-      '<button onclick="if(confirm(\'本当に全消去しますか？\')) { dotsDB.put(null); localChunks={}; }" style="background:#ff3b30; color:white; margin-top:10px;">全データ消去</button>' +
-     '</div>';
-   }
-  } else {
-   alert("パスワードが違います");
+ if (check === "MjAzMDIwMg==") {
+  const m = document.getElementById('admin-mount');
+  if(m.innerHTML === "") {
+  m.innerHTML = 
+   '<div class="glass admin-box">' +
+   '<label style="color:#ff3b30; font-weight:bold;">Admin Tools</label>' +
+   '<div style="margin-bottom:10px; margin-top:5px;">' +
+    '<label>筆の太さ: <span id="brushSizeVal">' + brushSize + '</span></label>' +
+    '<input type="range" min="1" max="50" value="' + brushSize + '" oninput="brushSize=this.value;document.getElementById(\'brushSizeVal\').innerText=this.value">' +
+   '</div>' +
+   '<label>スタンプ</label>' +
+   '<input type="file" id="imgInput" accept="image/*">' +
+   '<div style="display:flex; gap:5px; margin-top:5px;">' +
+    '<input type="number" id="imgW" placeholder="幅" value="64">' +
+    '<button onclick="loadStamp()" style="background:#007AFF; color:white;">Load</button>' +
+   '</div>' +
+   '<button onclick="if(confirm(\'本当に全消去しますか？\')) { dotsDB.put(null); localChunks={}; }" style="background:#ff3b30; color:white; margin-top:10px;">全データ消去</button>' +
+   '</div>';
   }
+ } else {
+  alert("パスワードが違います");
+ }
  }
 });
 
@@ -551,62 +559,62 @@ window.loadStamp = function() {
  if (!f) return;
  const r = new FileReader();
  r.onload = function(e) {
-  const img = new Image();
-  img.onload = function() {
-   const w = parseInt(document.getElementById('imgW').value) || 50;
-   const h = Math.floor(w * (img.height / img.width));
-   const c = document.createElement('canvas');
-   c.width = w;
-   c.height = h;
-   const ctx = c.getContext('2d');
-   ctx.drawImage(img, 0, 0, w, h);
-   const d = ctx.getImageData(0, 0, w, h).data;
-   stampData = [];
-   for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-     const i = (y * w + x) * 4;
-     if (d[i + 3] > 128) {
-      stampData.push({
-       x: x,
-       y: y,
-       hex: "#" + ((1 << 24) + (d[i] << 16) + (d[i + 1] << 8) + d[i + 2]).toString(16).slice(1)
-      });
-     }
-    }
+ const img = new Image();
+ img.onload = function() {
+  const w = parseInt(document.getElementById('imgW').value) || 50;
+  const h = Math.floor(w * (img.height / img.width));
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0, w, h);
+  const d = ctx.getImageData(0, 0, w, h).data;
+  stampData = [];
+  for (let y = 0; y < h; y++) {
+  for (let x = 0; x < w; x++) {
+   const i = (y * w + x) * 4;
+   if (d[i + 3] > 128) {
+   stampData.push({
+    x: x,
+    y: y,
+    hex: "#" + ((1 << 24) + (d[i] << 16) + (d[i + 1] << 8) + d[i + 2]).toString(16).slice(1)
+   });
    }
-   alert("ロード完了。キャンバスをクリックで配置");
-  };
-  img.src = e.target.result;
+  }
+  }
+  alert("ロード完了。キャンバスをクリックで配置");
+ };
+ img.src = e.target.result;
  };
  r.readAsDataURL(f);
 };
 
 canvas.onclick = function(e) {
  if (stampData && !isDragging) {
-  const w = toWorld(e.clientX, e.clientY);
-  const wx = w.wx;
-  const wy = w.wy;
+ const w = toWorld(e.clientX, e.clientY);
+ const wx = w.wx;
+ const wy = w.wy;
   
-  let idx = 0;
-  function loop() {
-   for (let i = 0; i < 50 && idx < stampData.length; i++, idx++) {
-    const p = stampData[idx];
-    const tx = wx + p.x;
-    const ty = wy + p.y;
-    
-    dotsDB.get(tx + "_" + ty).put(encodeCol(p.hex));
-    updateLocalPixel(tx, ty, p.hex);
-    localChannel.postMessage({
-     type: 'pixel',
-     x: tx,
-     y: ty,
-     c: p.hex
-    });
-   }
-   if (idx < stampData.length) requestAnimationFrame(loop);
-   else stampData = null;
+ let idx = 0;
+ function loop() {
+  for (let i = 0; i < 50 && idx < stampData.length; i++, idx++) {
+  const p = stampData[idx];
+  const tx = wx + p.x;
+  const ty = wy + p.y;
+   
+  dotsDB.get(tx + "_" + ty).put(encodeCol(p.hex));
+  updateLocalPixel(tx, ty, p.hex);
+  localChannel.postMessage({
+   type: 'pixel',
+   x: tx,
+   y: ty,
+   c: p.hex
+  });
   }
-  loop();
+  if (idx < stampData.length) requestAnimationFrame(loop);
+  else stampData = null;
+ }
+ loop();
  }
 };
 
